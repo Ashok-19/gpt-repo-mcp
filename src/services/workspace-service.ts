@@ -54,6 +54,27 @@ const GENERIC_ALLOWED = new Set([
 ]);
 const GIT_ALLOWED = new Set(["status", "diff", "log", "rev-parse"]);
 const NPM_BLOCKED = new Set(["install", "i", "add", "update", "upgrade", "publish", "audit", "fund", "login"]);
+const PATH_LIKE_EXTENSIONS = new Set([
+  ".py",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".sh",
+  ".json",
+  ".zip",
+  ".onnx",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".sqlite",
+  ".db",
+  ".pkl",
+  ".npy",
+  ".npz",
+  ".txt",
+  ".csv",
+  ".tsv"
+]);
 
 export class WorkspaceService {
   constructor(
@@ -71,6 +92,7 @@ export class WorkspaceService {
     const cmd = input.cmd;
     this.assertCommandAllowed(cmd);
     await this.assertNoOutsideAbsolutePaths(cmd);
+    await this.assertPathLikeArgsInsideRoot(cmd);
     await this.assertCommandPathEffects(cmd);
 
     const timeoutSeconds = Math.min(
@@ -152,12 +174,13 @@ export class WorkspaceService {
 
   async exportFile(input: Omit<WorkspaceExportFileInput, "repo_id">) {
     this.policy.assertReason(input.reason);
+    const requestedPath = validateRepoPath(input.path);
+    if (this.policy.isSecretPath(requestedPath)) {
+      throw new RepoReaderError("SECRET_CANDIDATE_BLOCKED", `Secret candidate blocked: ${requestedPath}`);
+    }
     const resolved = await this.sandbox.resolve(input.path);
     if (!resolved.stat.isFile()) {
       throw new RepoReaderError("UNSUPPORTED_FILE_TYPE", `Not a regular file: ${resolved.repoPath}`);
-    }
-    if (this.policy.isSecretPath(resolved.repoPath)) {
-      throw new RepoReaderError("SECRET_CANDIDATE_BLOCKED", `Secret candidate blocked: ${resolved.repoPath}`);
     }
     const maxBytes = Math.min(input.max_bytes ?? this.policy.config.export_max_bytes, this.policy.config.export_max_bytes);
     if (resolved.stat.size > maxBytes) {
@@ -291,25 +314,37 @@ export class WorkspaceService {
     const deleted: Array<{ path: string; type: "file" | "directory" }> = [];
     const skipped: Array<{ path: string; reason: string }> = [];
     for (const path of input.paths) {
-      const repoPath = this.policy.assertDeletePath(path);
-      const resolved = await this.sandbox.resolve(repoPath).catch((error: unknown) => {
-        if (isNotFoundError(error)) return undefined;
-        throw error;
-      });
-      if (!resolved) {
-        skipped.push({ path: repoPath, reason: "NOT_FOUND" });
+      let repoPath: string;
+      try {
+        repoPath = this.policy.assertDeletePath(path);
+      } catch (error) {
+        skipped.push({ path, reason: toRepoReaderError(error).code });
         continue;
       }
-      if (!resolved.stat.isFile() && !resolved.stat.isDirectory()) {
-        throw new RepoReaderError("UNSUPPORTED_FILE_TYPE", `Unsupported delete target: ${repoPath}`);
-      }
-      const tracked = await this.isTracked(repoPath);
-      if (tracked) {
-        throw new RepoReaderError("CLEANUP_TRACKED_PATH", `Delete target is tracked by git: ${repoPath}`);
-      }
-      deleted.push({ path: repoPath, type: resolved.stat.isDirectory() ? "directory" : "file" });
-      if (!dryRun) {
-        await rm(resolved.absolutePath, { recursive: resolved.stat.isDirectory() });
+      try {
+        const resolved = await this.sandbox.resolve(repoPath).catch((error: unknown) => {
+          if (isNotFoundError(error)) return undefined;
+          throw error;
+        });
+        if (!resolved) {
+          skipped.push({ path: repoPath, reason: "NOT_FOUND" });
+          continue;
+        }
+        if (!resolved.stat.isFile() && !resolved.stat.isDirectory()) {
+          skipped.push({ path: repoPath, reason: "UNSUPPORTED_FILE_TYPE" });
+          continue;
+        }
+        const tracked = await this.isTracked(repoPath);
+        if (tracked) {
+          skipped.push({ path: repoPath, reason: "CLEANUP_TRACKED_PATH" });
+          continue;
+        }
+        deleted.push({ path: repoPath, type: resolved.stat.isDirectory() ? "directory" : "file" });
+        if (!dryRun) {
+          await rm(resolved.absolutePath, { recursive: resolved.stat.isDirectory() });
+        }
+      } catch (error) {
+        skipped.push({ path: repoPath, reason: toRepoReaderError(error).code });
       }
     }
     return { ok: true as const, dry_run: dryRun, deleted, skipped, warnings: [] };
@@ -429,6 +464,12 @@ export class WorkspaceService {
     if (cmd.some((arg) => arg.includes("\0"))) {
       throw new RepoReaderError("VALIDATION_ERROR", "NUL bytes are not allowed in cmd.");
     }
+    if (cmd.length === 1 && /[\s;&|`$<>]/.test(cmd[0] ?? "")) {
+      throw new RepoReaderError("OPERATIONS_DISABLED", "Shell command strings are not allowed; pass an argv array.");
+    }
+    if (/[\s;&|`$<>]/.test(cmd[0] ?? "")) {
+      throw new RepoReaderError("OPERATIONS_DISABLED", "Executable name is not allowed.");
+    }
     if (cmd.join(" ") === "rm -rf /") {
       throw new RepoReaderError("OPERATIONS_DISABLED", "Dangerous rm command is blocked.");
     }
@@ -442,6 +483,28 @@ export class WorkspaceService {
         if (!isWithin(rootReal, candidate)) {
           throw new RepoReaderError("ABSOLUTE_PATH_REJECTED", `Absolute path is outside approved repository: ${arg}`);
         }
+      }
+    }
+  }
+
+  private async assertPathLikeArgsInsideRoot(cmd: string[]): Promise<void> {
+    for (const arg of cmd.slice(1)) {
+      if (!isPathLikeArg(arg)) {
+        continue;
+      }
+      const repoPath = validateRepoPath(arg);
+      const absolutePath = join(this.root, repoPath);
+      try {
+        const rootReal = await realpath(this.root);
+        const targetReal = await realpath(absolutePath);
+        if (!isWithin(rootReal, targetReal)) {
+          throw new RepoReaderError("SYMLINK_ESCAPE_REJECTED", `Path argument escapes approved repository: ${repoPath}`);
+        }
+      } catch (error) {
+        if (isNotFoundError(error)) {
+          continue;
+        }
+        throw error;
       }
     }
   }
@@ -527,6 +590,15 @@ function sha256(content: Buffer): string {
 
 function isRepoLocalExecutable(command: string): boolean {
   return command.startsWith("./") || command.startsWith("../") || command.includes("/");
+}
+
+function isPathLikeArg(arg: string): boolean {
+  if (arg.length === 0 || arg.startsWith("-") || /^[a-z]+:\/\//i.test(arg)) {
+    return false;
+  }
+  return arg.startsWith(".")
+    || arg.includes("/")
+    || PATH_LIKE_EXTENSIONS.has(extname(arg).toLowerCase());
 }
 
 function isWithin(rootPath: string, targetPath: string): boolean {
@@ -615,6 +687,6 @@ export function decodeUtf8ForWorkspace(content: Buffer, repoPath: string): strin
   try {
     return textDecoder.decode(content);
   } catch {
-    throw new RepoReaderError("BINARY_FILE_REJECTED", `Binary file blocked: ${repoPath}. Use workspace_export_file for binary files.`);
+    throw new RepoReaderError("BINARY_FILE_REJECTED", `Non-text file blocked: ${repoPath}. Use workspace_create_file_artifact for file artifacts.`);
   }
 }

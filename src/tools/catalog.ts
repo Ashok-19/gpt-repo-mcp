@@ -33,6 +33,8 @@ import {
   writeHandoffHandler,
   policyExplainHandler,
   workspaceApplyPatchHandler,
+  workspaceCleanupPathsHandler,
+  workspaceCreateFileArtifactHandler,
   workspaceDeletePathsHandler,
   workspaceExecHandler,
   workspaceExportFileHandler,
@@ -362,12 +364,21 @@ export const toolCatalog: ToolDefinition[] = [
   },
   {
     name: "workspace_export_file",
-    title: "Export repo file artifact",
+    title: "Create compatibility file artifact",
     description: descriptions.workspace_export_file,
     inputSchema: toolContracts.workspace_export_file.input,
     outputSchema: toolContracts.workspace_export_file.output,
     annotations: readOnlyAnnotations,
     handler: workspaceExportFileHandler
+  },
+  {
+    name: "workspace_create_file_artifact",
+    title: "Create workspace file artifact",
+    description: descriptions.workspace_create_file_artifact,
+    inputSchema: toolContracts.workspace_create_file_artifact.input,
+    outputSchema: toolContracts.workspace_create_file_artifact.output,
+    annotations: readOnlyAnnotations,
+    handler: workspaceCreateFileArtifactHandler
   },
   {
     name: "workspace_import_file",
@@ -452,12 +463,21 @@ export const toolCatalog: ToolDefinition[] = [
   },
   {
     name: "workspace_delete_paths",
-    title: "Delete workspace generated paths",
+    title: "Compatibility workspace cleanup",
     description: descriptions.workspace_delete_paths,
     inputSchema: toolContracts.workspace_delete_paths.input,
     outputSchema: toolContracts.workspace_delete_paths.output,
     annotations: writeAnnotations,
     handler: workspaceDeletePathsHandler
+  },
+  {
+    name: "workspace_cleanup_paths",
+    title: "Clean workspace scratch paths",
+    description: descriptions.workspace_cleanup_paths,
+    inputSchema: toolContracts.workspace_cleanup_paths.input,
+    outputSchema: toolContracts.workspace_cleanup_paths.output,
+    annotations: writeAnnotations,
+    handler: workspaceCleanupPathsHandler
   },
   {
     name: "workspace_git_status",

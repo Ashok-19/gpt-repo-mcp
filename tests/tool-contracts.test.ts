@@ -82,6 +82,7 @@ describe("tool catalog contracts", () => {
       "repo_write_handoff",
       "workspace_exec",
       "workspace_export_file",
+      "workspace_create_file_artifact",
       "workspace_import_file",
       "workspace_file_info",
       "workspace_tree",
@@ -92,6 +93,7 @@ describe("tool catalog contracts", () => {
       "workspace_apply_patch",
       "workspace_make_dir",
       "workspace_delete_paths",
+      "workspace_cleanup_paths",
       "workspace_git_status",
       "workspace_git_diff",
       "workspace_policy_explain"
@@ -132,7 +134,8 @@ describe("tool catalog contracts", () => {
       "workspace_write_file",
       "workspace_apply_patch",
       "workspace_make_dir",
-      "workspace_delete_paths"
+      "workspace_delete_paths",
+      "workspace_cleanup_paths"
     ]);
     const writeFile = toolCatalog.find((tool) => tool.name === "repo_write_file");
     const policyExplain = toolCatalog.find((tool) => tool.name === "repo_policy_explain");
@@ -1641,7 +1644,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": false,
           },
-          "description": "Use this when the user asks to run a local repo command. Runs argv-only commands inside an approved repository or subdirectory; blocks sudo, network tools, unsafe git mutation, shell strings, and path escapes.",
+          "description": "Use this when the user asks to run a local repository script or validation command. Runs an argv array inside an approved repository with policy checks and bounded output.",
           "inputKeys": [
             "cmd",
             "cwd",
@@ -1675,7 +1678,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": true,
           },
-          "description": "Use this when the user needs a repo-local file as an artifact, especially binary files such as zip, png, sqlite, or onnx. Exports a mounted reference without inlining file bytes.",
+          "description": "Use this when compatibility requires the older file artifact name. Prefer workspace_create_file_artifact for creating a mounted reference to an approved repo-local file.",
           "inputKeys": [
             "max_bytes",
             "path",
@@ -1692,7 +1695,33 @@ describe("tool catalog contracts", () => {
             "size_bytes",
             "warnings",
           ],
-          "title": "Export repo file artifact",
+          "title": "Create compatibility file artifact",
+        },
+        {
+          "annotations": {
+            "destructiveHint": false,
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "readOnlyHint": true,
+          },
+          "description": "Use this when the user needs a mounted reference for an approved repo-local file. Returns file metadata and a local artifact path without inlining contents.",
+          "inputKeys": [
+            "max_bytes",
+            "path",
+            "reason",
+            "repo_id",
+          ],
+          "name": "workspace_create_file_artifact",
+          "outputKeys": [
+            "mime",
+            "mounted_path",
+            "path",
+            "resource_uri",
+            "sha256",
+            "size_bytes",
+            "warnings",
+          ],
+          "title": "Create workspace file artifact",
         },
         {
           "annotations": {
@@ -1701,7 +1730,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": false,
           },
-          "description": "Use this when the user asks to move a mounted artifact or local file into a configured workspace scratch/write location for generated reports, logs, candidates, or experiment outputs.",
+          "description": "Use this when the user asks to place a mounted artifact or local file into an approved workspace scratch location.",
           "inputKeys": [
             "dest_path",
             "overwrite",
@@ -1725,7 +1754,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": true,
           },
-          "description": "Use this when the user asks for metadata about a repo-local file or directory without reading full contents. Prefer this before exporting binary or large files.",
+          "description": "Use this when the user asks for metadata about an approved repo-local path without reading file contents.",
           "inputKeys": [
             "include_hash",
             "include_mime",
@@ -1757,7 +1786,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": true,
           },
-          "description": "Use this when the user asks to inspect repository structure without reading contents. Supports pagination, glob filters, file sizes, and explicit nested-repo expansion.",
+          "description": "Use this when the user asks to inspect repository structure without reading file contents. Supports pagination, filters, file sizes, and optional nested-repo expansion.",
           "inputKeys": [
             "cursor",
             "exclude_globs",
@@ -1788,7 +1817,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": true,
           },
-          "description": "Use this when the user asks to read a specific UTF-8 text file with optional line ranges. Binary files are rejected with guidance to use workspace_export_file.",
+          "description": "Use this when the user asks to read a specific UTF-8 text file with optional line ranges. Non-text files return guidance to use workspace_create_file_artifact.",
           "inputKeys": [
             "end_byte",
             "end_line",
@@ -1879,7 +1908,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": false,
           },
-          "description": "Use this when the user asks to write or exactly edit one UTF-8 text file inside configured workspace scratch/write globs only. Never stages or commits.",
+          "description": "Use this when the user asks to write or exactly edit one UTF-8 text file inside an approved workspace scratch location. Never stages or commits.",
           "inputKeys": [
             "action",
             "content",
@@ -1939,7 +1968,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": false,
           },
-          "description": "Use this when the user asks to create directories inside configured workspace scratch/write globs, with dry-run support.",
+          "description": "Use this when the user asks to create directories inside approved workspace scratch locations, with dry-run support.",
           "inputKeys": [
             "dry_run",
             "parents",
@@ -1963,7 +1992,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": false,
           },
-          "description": "Use this when the user explicitly asks to delete generated or scratch paths. Defaults to dry-run, rejects globs and tracked files, and never runs git clean.",
+          "description": "Use this when compatibility requires the older cleanup name. Prefer workspace_cleanup_paths for removing explicit approved scratch paths.",
           "inputKeys": [
             "dry_run",
             "paths",
@@ -1978,7 +2007,31 @@ describe("tool catalog contracts", () => {
             "skipped",
             "warnings",
           ],
-          "title": "Delete workspace generated paths",
+          "title": "Compatibility workspace cleanup",
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "readOnlyHint": false,
+          },
+          "description": "Use this when the user explicitly asks to remove approved scratch paths. Accepts explicit paths only, defaults to dry-run, and refuses tracked files.",
+          "inputKeys": [
+            "dry_run",
+            "paths",
+            "reason",
+            "repo_id",
+          ],
+          "name": "workspace_cleanup_paths",
+          "outputKeys": [
+            "deleted",
+            "dry_run",
+            "ok",
+            "skipped",
+            "warnings",
+          ],
+          "title": "Clean workspace scratch paths",
         },
         {
           "annotations": {
@@ -2038,7 +2091,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": true,
           },
-          "description": "Use this when the user asks whether a workspace read, write, exec, export, or delete operation is allowed for a path and which policy matched.",
+          "description": "Use this when the user asks whether a workspace read, write, exec, export, or cleanup operation is allowed for a path and which policy matched.",
           "inputKeys": [
             "operation",
             "path",
@@ -2051,6 +2104,7 @@ describe("tool catalog contracts", () => {
             "matched_deny_globs",
             "next_step",
             "reason",
+            "suggested_tool",
           ],
           "title": "Explain workspace policy",
         },

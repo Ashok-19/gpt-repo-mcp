@@ -75,6 +75,7 @@ export type ToolName =
   | "repo_write_handoff"
   | "workspace_exec"
   | "workspace_export_file"
+  | "workspace_create_file_artifact"
   | "workspace_import_file"
   | "workspace_file_info"
   | "workspace_tree"
@@ -85,6 +86,7 @@ export type ToolName =
   | "workspace_apply_patch"
   | "workspace_make_dir"
   | "workspace_delete_paths"
+  | "workspace_cleanup_paths"
   | "workspace_git_status"
   | "workspace_git_diff"
   | "workspace_policy_explain";
@@ -231,6 +233,10 @@ export const toolContracts = {
     input: WorkspaceExportFileInputSchema,
     output: WorkspaceExportFileResultSchema
   },
+  workspace_create_file_artifact: {
+    input: WorkspaceExportFileInputSchema,
+    output: WorkspaceExportFileResultSchema
+  },
   workspace_import_file: {
     input: WorkspaceImportFileInputSchema,
     output: WorkspaceImportFileResultSchema
@@ -268,6 +274,10 @@ export const toolContracts = {
     output: WorkspaceMakeDirResultSchema
   },
   workspace_delete_paths: {
+    input: WorkspaceDeletePathsInputSchema,
+    output: WorkspaceDeletePathsResultSchema
+  },
+  workspace_cleanup_paths: {
     input: WorkspaceDeletePathsInputSchema,
     output: WorkspaceDeletePathsResultSchema
   },

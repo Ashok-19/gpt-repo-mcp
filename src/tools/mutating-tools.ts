@@ -20,7 +20,8 @@ export const MUTATING_TOOL_NAMES = [
   "workspace_write_file",
   "workspace_apply_patch",
   "workspace_make_dir",
-  "workspace_delete_paths"
+  "workspace_delete_paths",
+  "workspace_cleanup_paths"
 ] as const satisfies readonly ToolName[];
 
 const MUTATING_TOOL_NAME_SET = new Set<ToolName>(MUTATING_TOOL_NAMES);

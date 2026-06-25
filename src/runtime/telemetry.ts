@@ -19,6 +19,10 @@ export type AuditEvent = {
   counts?: Record<string, number>;
   truncated?: boolean;
   warnings?: string[];
+  cwd?: string;
+  command_family?: string;
+  rejection_reason?: string;
+  error_code?: string;
   request_id?: string;
   mcp_method?: string;
   mcp_tool?: string;
@@ -156,7 +160,11 @@ export function createAuditEvent(event: AuditEvent): AuditEvent {
     mcp_tool: sanitizeAuditLabel(event.mcp_tool ?? context?.mcp_tool),
     paths: event.paths?.map((path) => redactSensitiveText(path)),
     globs: event.globs?.map((glob) => redactSensitiveText(glob)),
-    warnings: event.warnings?.map((warning) => redactSensitiveText(warning))
+    warnings: event.warnings?.map((warning) => redactSensitiveText(warning)),
+    cwd: sanitizeAuditLabel(event.cwd),
+    command_family: sanitizeAuditLabel(event.command_family),
+    rejection_reason: sanitizeAuditLabel(event.rejection_reason),
+    error_code: sanitizeAuditLabel(event.error_code)
   };
   return withoutUndefinedAuditFields(safe);
 }

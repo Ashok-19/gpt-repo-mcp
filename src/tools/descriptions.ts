@@ -64,33 +64,37 @@ export const descriptions = {
   repo_write_handoff:
     "Use this when the user asks for a local-only ChatGPT handoff: skapa handoff, create handoff, skriv handoff, session handoff, resume note, fortsättningsanteckning, ny chatt context, or överlämning till nästa chatt. Creates .chatgpt/handoffs/*.local.md and updates current.local.md; never stages, commits, pushes, resets, checks out, or runs shell commands.",
   workspace_exec:
-    "Use this when the user asks to run a local repo command. Runs argv-only commands inside an approved repository or subdirectory; blocks sudo, network tools, unsafe git mutation, shell strings, and path escapes.",
+    "Use this when the user asks to run a local repository script or validation command. Runs an argv array inside an approved repository with policy checks and bounded output.",
   workspace_export_file:
-    "Use this when the user needs a repo-local file as an artifact, especially binary files such as zip, png, sqlite, or onnx. Exports a mounted reference without inlining file bytes.",
+    "Use this when compatibility requires the older file artifact name. Prefer workspace_create_file_artifact for creating a mounted reference to an approved repo-local file.",
+  workspace_create_file_artifact:
+    "Use this when the user needs a mounted reference for an approved repo-local file. Returns file metadata and a local artifact path without inlining contents.",
   workspace_import_file:
-    "Use this when the user asks to move a mounted artifact or local file into a configured workspace scratch/write location for generated reports, logs, candidates, or experiment outputs.",
+    "Use this when the user asks to place a mounted artifact or local file into an approved workspace scratch location.",
   workspace_file_info:
-    "Use this when the user asks for metadata about a repo-local file or directory without reading full contents. Prefer this before exporting binary or large files.",
+    "Use this when the user asks for metadata about an approved repo-local path without reading file contents.",
   workspace_tree:
-    "Use this when the user asks to inspect repository structure without reading contents. Supports pagination, glob filters, file sizes, and explicit nested-repo expansion.",
+    "Use this when the user asks to inspect repository structure without reading file contents. Supports pagination, filters, file sizes, and optional nested-repo expansion.",
   workspace_read_file:
-    "Use this when the user asks to read a specific UTF-8 text file with optional line ranges. Binary files are rejected with guidance to use workspace_export_file.",
+    "Use this when the user asks to read a specific UTF-8 text file with optional line ranges. Non-text files return guidance to use workspace_create_file_artifact.",
   workspace_read_many:
     "Use this when the user asks to read a bounded explicit or glob-matched set of UTF-8 text files. Skips binary files and never reads whole repositories accidentally.",
   workspace_search:
     "Use this when the user asks to search repository text files. Supports literal or regex queries, include/exclude globs, context lines, pagination, and secret-path blocking.",
   workspace_write_file:
-    "Use this when the user asks to write or exactly edit one UTF-8 text file inside configured workspace scratch/write globs only. Never stages or commits.",
+    "Use this when the user asks to write or exactly edit one UTF-8 text file inside an approved workspace scratch location. Never stages or commits.",
   workspace_apply_patch:
     "Use this when the user asks to apply a unified text diff and every touched file is inside configured workspace scratch/write globs. Rejects binary patches and never stages or commits.",
   workspace_make_dir:
-    "Use this when the user asks to create directories inside configured workspace scratch/write globs, with dry-run support.",
+    "Use this when the user asks to create directories inside approved workspace scratch locations, with dry-run support.",
   workspace_delete_paths:
-    "Use this when the user explicitly asks to delete generated or scratch paths. Defaults to dry-run, rejects globs and tracked files, and never runs git clean.",
+    "Use this when compatibility requires the older cleanup name. Prefer workspace_cleanup_paths for removing explicit approved scratch paths.",
+  workspace_cleanup_paths:
+    "Use this when the user explicitly asks to remove approved scratch paths. Accepts explicit paths only, defaults to dry-run, and refuses tracked files.",
   workspace_git_status:
     "Use this when the user asks for local git status without mutation, including branch, HEAD, and changed/untracked files.",
   workspace_git_diff:
     "Use this when the user asks to read local git diff safely without mutation. Use path and byte limits when the diff is broad.",
   workspace_policy_explain:
-    "Use this when the user asks whether a workspace read, write, exec, export, or delete operation is allowed for a path and which policy matched."
+    "Use this when the user asks whether a workspace read, write, exec, export, or cleanup operation is allowed for a path and which policy matched."
 } as const;

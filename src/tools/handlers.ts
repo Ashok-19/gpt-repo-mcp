@@ -431,6 +431,13 @@ export const workspaceExportFileHandler: ToolHandler = async (input, context) =>
   return createSuccessEnvelope(result, `Exported ${result.path}.`, { warnings: result.warnings });
 });
 
+export const workspaceCreateFileArtifactHandler: ToolHandler = async (input, context) => safeTool<WorkspaceExportFileInput>("workspace_create_file_artifact", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).exportFile(args);
+  audit({ tool: "workspace_create_file_artifact", repo_id: args.repo_id, paths: [result.path], counts: { bytes: result.size_bytes }, warnings: result.warnings });
+  return createSuccessEnvelope(result, `Created artifact reference for ${result.path}.`, { warnings: result.warnings });
+});
+
 export const workspaceImportFileHandler: ToolHandler = async (input, context) => safeTool<WorkspaceImportFileInput>("workspace_import_file", input, context, async (args) => {
   const repo = context.registry.get(args.repo_id);
   const result = await workspaceService(repo.root, context).importFile(args);
@@ -490,6 +497,13 @@ export const workspaceDeletePathsHandler: ToolHandler = async (input, context) =
   return createSuccessEnvelope(result, result.dry_run ? `Dry run checked deleting ${result.deleted.length} paths.` : `Deleted ${result.deleted.length} paths.`, { warnings: result.warnings });
 });
 
+export const workspaceCleanupPathsHandler: ToolHandler = async (input, context) => safeTool<WorkspaceDeletePathsInput>("workspace_cleanup_paths", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).deletePaths(args);
+  audit({ tool: "workspace_cleanup_paths", repo_id: args.repo_id, paths: result.deleted.map((entry) => entry.path), warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run checked ${result.deleted.length} cleanup paths.` : `Cleaned ${result.deleted.length} paths.`, { warnings: result.warnings });
+});
+
 export const workspacePolicyExplainHandler: ToolHandler = async (input, context) => safeTool<WorkspacePolicyExplainInput>("workspace_policy_explain", input, context, async (args) => {
   const repo = context.registry.get(args.repo_id);
   const result = workspaceService(repo.root, context).policyExplain(args.path, args.operation);
@@ -506,13 +520,73 @@ async function safeTool<TInput extends Record<string, unknown>>(
   try {
     return await run(input as TInput);
   } catch (error) {
-    audit({ tool, repo_id: typeof input === "object" && input && "repo_id" in input ? String(input.repo_id) : undefined, warnings: [toRepoReaderError(error).code] });
-    return createErrorEnvelope(toRepoReaderError(error));
+    const normalized = toRepoReaderError(error);
+    audit({
+      tool,
+      repo_id: typeof input === "object" && input && "repo_id" in input ? String(input.repo_id) : undefined,
+      ...workspaceRejectionAuditFields(tool, input, context),
+      warnings: [normalized.code],
+      error_code: normalized.code,
+      rejection_reason: normalized.message
+    });
+    return createErrorEnvelope(normalized);
   }
 }
 
 function workspaceService(root: string, context: RuntimeContext): WorkspaceService {
   return new WorkspaceService(root, new PathSandbox(root), new WorkspacePolicy(context.registry.workspace));
+}
+
+function workspaceRejectionAuditFields(tool: string, input: unknown, context: RuntimeContext): {
+  paths?: string[];
+  globs?: string[];
+  cwd?: string;
+  command_family?: string;
+} {
+  if (!tool.startsWith("workspace_") || !input || typeof input !== "object") {
+    return {};
+  }
+  const args = input as Record<string, unknown>;
+  const paths = collectAuditPaths(args);
+  const policy = new WorkspacePolicy(context.registry.workspace);
+  const operation = tool.includes("cleanup") || tool.includes("delete")
+    ? "delete"
+    : tool.includes("write") || tool.includes("patch") || tool.includes("make_dir") || tool.includes("import")
+      ? "write"
+      : tool.includes("exec")
+        ? "exec"
+        : tool.includes("artifact") || tool.includes("export")
+          ? "export"
+          : "read";
+  const globs = paths.flatMap((path) => {
+    try {
+      return policy.explain(path, operation).matched_allow_globs;
+    } catch {
+      return [];
+    }
+  });
+  const cmd = Array.isArray(args.cmd) ? args.cmd : undefined;
+  return {
+    ...(paths.length > 0 ? { paths } : {}),
+    ...(globs.length > 0 ? { globs: [...new Set(globs)] } : {}),
+    ...(typeof args.cwd === "string" ? { cwd: args.cwd } : {}),
+    ...(cmd && typeof cmd[0] === "string" ? { command_family: commandFamily(cmd[0]) } : {})
+  };
+}
+
+function collectAuditPaths(args: Record<string, unknown>): string[] {
+  const paths: string[] = [];
+  if (typeof args.path === "string") paths.push(args.path);
+  if (typeof args.dest_path === "string") paths.push(args.dest_path);
+  if (Array.isArray(args.paths)) {
+    paths.push(...args.paths.filter((path): path is string => typeof path === "string"));
+  }
+  if (typeof args.cwd === "string") paths.push(args.cwd);
+  return paths;
+}
+
+function commandFamily(command: string): string {
+  return command.replaceAll("\\", "/").split("/").filter(Boolean).at(-1) ?? command;
 }
 
 async function readHeadSha(root: string): Promise<string | undefined> {

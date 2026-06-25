@@ -16,7 +16,7 @@ export type WorkspacePolicyDefaults = {
 export const DEFAULT_WORKSPACE_POLICY: WorkspacePolicyDefaults = {
   exec_enabled: true,
   exec_default_timeout_seconds: 60,
-  exec_max_timeout_seconds: 600,
+  exec_max_timeout_seconds: 1800,
   exec_max_output_bytes: 200000,
   exec_allowed_roots: [] as string[],
   exec_write_allowed_globs: [

@@ -68,25 +68,29 @@ export class WorkspacePolicy {
       || lower.startsWith(".ssh/")
       || lower.endsWith("/.ssh")
       || lower.includes("/.ssh/")
-      || lower.includes("credential")
-      || lower.includes("credentials")
-      || lower.includes("secret");
+      || lower.split("/").includes("credentials")
+      || lower.split("/").includes("credential")
+      || lower.endsWith("/credentials.json")
+      || lower.endsWith("/credential.json");
   }
 
   explain(path: string, operation: "read" | "write" | "exec" | "export" | "delete") {
     const repoPath = validateRepoPath(path || ".");
     const secret = this.isSecretPath(repoPath);
     const matchedAllowGlobs = operation === "delete"
-      ? this.config.delete_allowed_globs.filter((glob) => ignore().add(glob).ignores(repoPath))
-      : this.config.exec_write_allowed_globs.filter((glob) => ignore().add(glob).ignores(repoPath));
+      ? this.config.delete_allowed_globs.filter((glob) => ignore().add(glob).ignores(repoPath) || ignore().add(glob).ignores(`${repoPath}/placeholder`))
+      : operation === "write"
+        ? this.config.exec_write_allowed_globs.filter((glob) => ignore().add(glob).ignores(repoPath) || ignore().add(glob).ignores(`${repoPath}/placeholder`))
+        : ["approved-repo-root"];
     const writeLike = operation === "write" || operation === "delete";
     const allowed = !secret && (!writeLike || matchedAllowGlobs.length > 0);
     return {
       allowed,
       matched_allow_globs: matchedAllowGlobs,
       matched_deny_globs: secret ? ["secret-path-patterns"] : [],
-      reason: allowed ? `${operation} is allowed by workspace policy.` : `${operation} is blocked by workspace policy.`,
-      next_step: allowed ? "Proceed with the requested workspace tool." : "Choose a non-secret path under an allowed scratch or experiment directory."
+      reason: allowed ? `${operation} is allowed for this approved repo-local path.` : `${operation} is blocked for this path by workspace policy.`,
+      next_step: allowed ? `Use ${suggestedTool(operation)}.` : "Choose a non-secret approved repo-local path, or use an allowed scratch/experiment path for writes and cleanup.",
+      suggested_tool: suggestedTool(operation)
     };
   }
 
@@ -99,4 +103,12 @@ export class WorkspacePolicy {
       return false;
     }
   }
+}
+
+function suggestedTool(operation: "read" | "write" | "exec" | "export" | "delete"): string {
+  if (operation === "exec") return "workspace_exec";
+  if (operation === "export") return "workspace_create_file_artifact";
+  if (operation === "delete") return "workspace_cleanup_paths";
+  if (operation === "write") return "workspace_write_file";
+  return "workspace_file_info";
 }

@@ -173,7 +173,8 @@ export const WorkspacePolicyExplainResultSchema = z.object({
   matched_allow_globs: z.array(z.string()),
   matched_deny_globs: z.array(z.string()),
   reason: z.string(),
-  next_step: z.string()
+  next_step: z.string(),
+  suggested_tool: z.string()
 });
 
 export type WorkspaceExecInput = z.infer<typeof WorkspaceExecInputSchema>;
