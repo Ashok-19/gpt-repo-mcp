@@ -4,5 +4,24 @@
     "max_files": 50,
     "max_bytes_per_file": 128000,
     "max_total_bytes": 750000
+  },
+  "workspace": {
+    "exec_enabled": true,
+    "exec_default_timeout_seconds": 60,
+    "exec_max_timeout_seconds": 600,
+    "exec_max_output_bytes": 200000,
+    "exec_allowed_roots": [],
+    "exec_write_allowed_globs": [
+      ".chatgpt/**",
+      "experiments/**",
+      "scratch/**",
+      "tmp/**",
+      "task*/experiments/**",
+      "task*/scratch/**",
+      "task*/tmp/**"
+    ],
+    "exec_block_network": true,
+    "exec_block_sudo": true,
+    "exec_require_reason": true
   }
 }

@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { DEFAULT_LIMITS } from "../policies/limits.js";
 import { RepoReaderError } from "../runtime/errors.js";
+import { isExcludedByGlob, matchesGlob } from "./glob-service.js";
 import { IgnoreEngine } from "./ignore-engine.js";
 import { PathSandbox, validateRepoPath } from "./path-sandbox.js";
 
@@ -12,6 +13,9 @@ export type TreeOptions = {
   respect_default_excludes?: boolean;
   include_generated?: boolean;
   include_dependencies?: boolean;
+  include_nested_repos?: boolean;
+  include_globs?: string[];
+  exclude_globs?: string[];
   cursor?: string;
 };
 
@@ -42,7 +46,9 @@ export class RepoTreeService {
       const boundary = await this.sandbox.classifyBoundary(repoPath);
       if (boundary.kind !== "normal" && repoPath !== ".") {
         entries.push({ path: boundary.path, type: boundary.kind });
-        return;
+        if (!options.include_nested_repos || boundary.kind !== "nested_repo") {
+          return;
+        }
       }
       if (resolved.stat.isDirectory()) {
         if (repoPath !== ".") {
@@ -77,6 +83,12 @@ export class RepoTreeService {
         return;
       }
       if (includeFiles && resolved.stat.isFile()) {
+        if (options.include_globs?.length && !options.include_globs.some((glob) => matchesGlob(repoPath, glob))) {
+          return;
+        }
+        if (isExcludedByGlob(repoPath, options.exclude_globs)) {
+          return;
+        }
         entries.push({ path: repoPath, type: "file", size_bytes: Number(resolved.stat.size) });
       }
     };

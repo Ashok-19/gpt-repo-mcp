@@ -18,6 +18,27 @@ import { SearchInputSchema, SearchResponseSchema } from "../contracts/search.con
 import { TaskInventoryInputSchema, TaskInventoryResultSchema } from "../contracts/task.contract.js";
 import { RepoTreeResultSchema } from "../contracts/tree.contract.js";
 import { WriteChangesInputSchema, WriteChangesResultSchema, WriteFileInputSchema, WriteFileResultSchema } from "../contracts/write.contract.js";
+import {
+  WorkspaceApplyPatchInputSchema,
+  WorkspaceApplyPatchResultSchema,
+  WorkspaceDeletePathsInputSchema,
+  WorkspaceDeletePathsResultSchema,
+  WorkspaceExecInputSchema,
+  WorkspaceExecResultSchema,
+  WorkspaceExportFileInputSchema,
+  WorkspaceExportFileResultSchema,
+  WorkspaceFileInfoInputSchema,
+  WorkspaceFileInfoResultSchema,
+  WorkspaceImportFileInputSchema,
+  WorkspaceImportFileResultSchema,
+  WorkspaceMakeDirInputSchema,
+  WorkspaceMakeDirResultSchema,
+  WorkspacePolicyExplainInputSchema,
+  WorkspacePolicyExplainResultSchema,
+  WorkspaceReadFileInputSchema,
+  WorkspaceReadManyInputSchema,
+  WorkspaceWriteFileInputSchema
+} from "../contracts/workspace.contract.js";
 
 export type ToolName =
   | "repo_list_roots"
@@ -51,7 +72,22 @@ export type ToolName =
   | "repo_codex_review"
   | "repo_write_file"
   | "repo_write_changes"
-  | "repo_write_handoff";
+  | "repo_write_handoff"
+  | "workspace_exec"
+  | "workspace_export_file"
+  | "workspace_import_file"
+  | "workspace_file_info"
+  | "workspace_tree"
+  | "workspace_read_file"
+  | "workspace_read_many"
+  | "workspace_search"
+  | "workspace_write_file"
+  | "workspace_apply_patch"
+  | "workspace_make_dir"
+  | "workspace_delete_paths"
+  | "workspace_git_status"
+  | "workspace_git_diff"
+  | "workspace_policy_explain";
 
 export type ToolContract = {
   input: z.ZodObject<z.ZodRawShape>;
@@ -186,5 +222,65 @@ export const toolContracts = {
   repo_write_handoff: {
     input: HandoffInputSchema,
     output: HandoffResultSchema
+  },
+  workspace_exec: {
+    input: WorkspaceExecInputSchema,
+    output: WorkspaceExecResultSchema
+  },
+  workspace_export_file: {
+    input: WorkspaceExportFileInputSchema,
+    output: WorkspaceExportFileResultSchema
+  },
+  workspace_import_file: {
+    input: WorkspaceImportFileInputSchema,
+    output: WorkspaceImportFileResultSchema
+  },
+  workspace_file_info: {
+    input: WorkspaceFileInfoInputSchema,
+    output: WorkspaceFileInfoResultSchema
+  },
+  workspace_tree: {
+    input: RepoTreeInputSchema,
+    output: RepoTreeResultSchema
+  },
+  workspace_read_file: {
+    input: WorkspaceReadFileInputSchema,
+    output: FileContentSchema
+  },
+  workspace_read_many: {
+    input: WorkspaceReadManyInputSchema,
+    output: ReadManyResultSchema
+  },
+  workspace_search: {
+    input: SearchInputSchema,
+    output: SearchResponseSchema
+  },
+  workspace_write_file: {
+    input: WorkspaceWriteFileInputSchema,
+    output: WriteFileResultSchema
+  },
+  workspace_apply_patch: {
+    input: WorkspaceApplyPatchInputSchema,
+    output: WorkspaceApplyPatchResultSchema
+  },
+  workspace_make_dir: {
+    input: WorkspaceMakeDirInputSchema,
+    output: WorkspaceMakeDirResultSchema
+  },
+  workspace_delete_paths: {
+    input: WorkspaceDeletePathsInputSchema,
+    output: WorkspaceDeletePathsResultSchema
+  },
+  workspace_git_status: {
+    input: GitStatusInputSchema,
+    output: GitStatusResultSchema
+  },
+  workspace_git_diff: {
+    input: GitDiffInputSchema,
+    output: GitDiffResultSchema
+  },
+  workspace_policy_explain: {
+    input: WorkspacePolicyExplainInputSchema,
+    output: WorkspacePolicyExplainResultSchema
   }
 } as const satisfies Record<ToolName, ToolContract>;

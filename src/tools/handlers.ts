@@ -23,6 +23,8 @@ import { PolicyExplainService } from "../services/policy-explain-service.js";
 import { FileWriter } from "../services/file-writer.js";
 import { WriteChangesService } from "../services/write-changes-service.js";
 import { WritePolicy } from "../services/write-policy.js";
+import { WorkspacePolicy } from "../services/workspace-policy.js";
+import { WorkspaceService } from "../services/workspace-service.js";
 import { OperationReceiptService } from "../services/operation-receipt-service.js";
 import { createErrorEnvelope, createSuccessEnvelope } from "../runtime/result-envelope.js";
 import { toRepoReaderError } from "../runtime/errors.js";
@@ -44,6 +46,17 @@ import type { GitCommitInput, GitRecoverInput, GitRestorePathsInput, GitStageCom
 import type { GitReviewInput } from "../contracts/git-review.contract.js";
 import type { CleanupPathsInput } from "../contracts/cleanup.contract.js";
 import type { HandoffInput } from "../contracts/handoff.contract.js";
+import type {
+  WorkspaceApplyPatchInput,
+  WorkspaceDeletePathsInput,
+  WorkspaceExecInput,
+  WorkspaceExportFileInput,
+  WorkspaceFileInfoInput,
+  WorkspaceImportFileInput,
+  WorkspaceMakeDirInput,
+  WorkspacePolicyExplainInput,
+  WorkspaceWriteFileInput
+} from "../contracts/workspace.contract.js";
 
 type RepoInput = { repo_id: string };
 type ReadManyInput = RepoInput & {
@@ -404,6 +417,86 @@ export const writeHandoffHandler: ToolHandler = async (input, context) => safeTo
   );
 });
 
+export const workspaceExecHandler: ToolHandler = async (input, context) => safeTool<WorkspaceExecInput>("workspace_exec", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).exec(args);
+  audit({ tool: "workspace_exec", repo_id: args.repo_id, counts: { exit_code: result.exit_code ?? -1 }, truncated: result.stdout_truncated || result.stderr_truncated });
+  return createSuccessEnvelope(result, result.timed_out ? `Command timed out in ${result.duration_ms}ms.` : `Command exited with ${result.exit_code}.`);
+});
+
+export const workspaceExportFileHandler: ToolHandler = async (input, context) => safeTool<WorkspaceExportFileInput>("workspace_export_file", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).exportFile(args);
+  audit({ tool: "workspace_export_file", repo_id: args.repo_id, paths: [result.path], counts: { bytes: result.size_bytes }, warnings: result.warnings });
+  return createSuccessEnvelope(result, `Exported ${result.path}.`, { warnings: result.warnings });
+});
+
+export const workspaceImportFileHandler: ToolHandler = async (input, context) => safeTool<WorkspaceImportFileInput>("workspace_import_file", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).importFile(args);
+  audit({ tool: "workspace_import_file", repo_id: args.repo_id, paths: [result.destination_path], counts: { bytes: result.size_bytes } });
+  return createSuccessEnvelope(result, `Imported ${result.destination_path}.`);
+});
+
+export const workspaceFileInfoHandler: ToolHandler = async (input, context) => safeTool<WorkspaceFileInfoInput>("workspace_file_info", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).fileInfo(args);
+  const blockedReason = "blocked_reason" in result ? result.blocked_reason : undefined;
+  audit({ tool: "workspace_file_info", repo_id: args.repo_id, paths: [result.path], warnings: blockedReason ? [blockedReason] : undefined });
+  return createSuccessEnvelope(result, result.exists ? `Returned metadata for ${result.path}.` : `Path does not exist or is blocked: ${result.path}.`);
+});
+
+export const workspaceTreeHandler = treeHandler;
+export const workspaceReadFileHandler = fetchFileHandler;
+export const workspaceReadManyHandler = readManyHandler;
+export const workspaceSearchHandler = searchHandler;
+export const workspaceGitStatusHandler = gitStatusHandler;
+export const workspaceGitDiffHandler = gitDiffHandler;
+
+export const workspaceWriteFileHandler: ToolHandler = async (input, context) => safeTool<WorkspaceWriteFileInput>("workspace_write_file", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const sandbox = new PathSandbox(repo.root);
+  const workspacePolicy = new WorkspacePolicy(context.registry.workspace);
+  workspacePolicy.assertReason(args.reason);
+  workspacePolicy.assertWritePath(args.path);
+  const result = await new FileWriter(repo.root, sandbox, new WritePolicy({
+    enabled: true,
+    allowed_globs: workspacePolicy.config.exec_write_allowed_globs,
+    denied_globs: [],
+    max_bytes_per_write: 1048576
+  })).write(args);
+  audit({ tool: "workspace_write_file", repo_id: args.repo_id, paths: [result.path], counts: { bytes: result.bytes_written }, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run checked write to ${result.path}.` : `Wrote ${result.path}.`, { warnings: result.warnings });
+});
+
+export const workspaceApplyPatchHandler: ToolHandler = async (input, context) => safeTool<WorkspaceApplyPatchInput>("workspace_apply_patch", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).applyPatch(args);
+  audit({ tool: "workspace_apply_patch", repo_id: args.repo_id, paths: result.changed_files, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.summary, { warnings: result.warnings });
+});
+
+export const workspaceMakeDirHandler: ToolHandler = async (input, context) => safeTool<WorkspaceMakeDirInput>("workspace_make_dir", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).makeDir(args);
+  audit({ tool: "workspace_make_dir", repo_id: args.repo_id, paths: [result.path] });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run checked mkdir ${result.path}.` : `Created ${result.path}.`);
+});
+
+export const workspaceDeletePathsHandler: ToolHandler = async (input, context) => safeTool<WorkspaceDeletePathsInput>("workspace_delete_paths", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).deletePaths(args);
+  audit({ tool: "workspace_delete_paths", repo_id: args.repo_id, paths: result.deleted.map((entry) => entry.path), warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run checked deleting ${result.deleted.length} paths.` : `Deleted ${result.deleted.length} paths.`, { warnings: result.warnings });
+});
+
+export const workspacePolicyExplainHandler: ToolHandler = async (input, context) => safeTool<WorkspacePolicyExplainInput>("workspace_policy_explain", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = workspaceService(repo.root, context).policyExplain(args.path, args.operation);
+  audit({ tool: "workspace_policy_explain", repo_id: args.repo_id, paths: [args.path], warnings: result.allowed ? undefined : [result.reason] });
+  return createSuccessEnvelope(result, result.reason);
+});
+
 async function safeTool<TInput extends Record<string, unknown>>(
   tool: string,
   input: unknown,
@@ -416,6 +509,10 @@ async function safeTool<TInput extends Record<string, unknown>>(
     audit({ tool, repo_id: typeof input === "object" && input && "repo_id" in input ? String(input.repo_id) : undefined, warnings: [toRepoReaderError(error).code] });
     return createErrorEnvelope(toRepoReaderError(error));
   }
+}
+
+function workspaceService(root: string, context: RuntimeContext): WorkspaceService {
+  return new WorkspaceService(root, new PathSandbox(root), new WorkspacePolicy(context.registry.workspace));
 }
 
 async function readHeadSha(root: string): Promise<string | undefined> {

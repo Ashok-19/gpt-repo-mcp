@@ -46,7 +46,7 @@ export class FileReader {
     }
     const classification = await this.classifier.classify(resolved.repoPath, resolved.absolutePath);
     if (classification.is_binary) {
-      throw new RepoReaderError("BINARY_FILE_REJECTED", `Binary file blocked: ${resolved.repoPath}`);
+      throw new RepoReaderError("BINARY_FILE_REJECTED", `Binary file blocked: ${resolved.repoPath}. Use workspace_export_file for binary files.`);
     }
 
     const rawText = content.toString("utf8");

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DEFAULT_OPERATIONS_POLICY } from "../policies/operations-defaults.js";
 import { DEFAULT_WRITE_POLICY } from "../policies/write-defaults.js";
+import { DEFAULT_WORKSPACE_POLICY } from "../policies/workspace-defaults.js";
 
 const PositiveIntSchema = z.number().int().positive();
 
@@ -43,9 +44,25 @@ export const LimitsConfigSchema = z.object({
   max_diff_bytes: PositiveIntSchema.optional()
 }).passthrough();
 
+export const WorkspacePolicyConfigSchema = z.object({
+  exec_enabled: z.boolean().default(DEFAULT_WORKSPACE_POLICY.exec_enabled),
+  exec_default_timeout_seconds: PositiveIntSchema.default(DEFAULT_WORKSPACE_POLICY.exec_default_timeout_seconds),
+  exec_max_timeout_seconds: PositiveIntSchema.default(DEFAULT_WORKSPACE_POLICY.exec_max_timeout_seconds),
+  exec_max_output_bytes: PositiveIntSchema.default(DEFAULT_WORKSPACE_POLICY.exec_max_output_bytes),
+  exec_allowed_roots: z.array(z.string()).default(DEFAULT_WORKSPACE_POLICY.exec_allowed_roots),
+  exec_write_allowed_globs: z.array(z.string()).default(DEFAULT_WORKSPACE_POLICY.exec_write_allowed_globs),
+  exec_block_network: z.boolean().default(DEFAULT_WORKSPACE_POLICY.exec_block_network),
+  exec_block_sudo: z.boolean().default(DEFAULT_WORKSPACE_POLICY.exec_block_sudo),
+  exec_require_reason: z.boolean().default(DEFAULT_WORKSPACE_POLICY.exec_require_reason),
+  export_max_bytes: PositiveIntSchema.default(DEFAULT_WORKSPACE_POLICY.export_max_bytes),
+  export_dir: z.string().default(DEFAULT_WORKSPACE_POLICY.export_dir),
+  delete_allowed_globs: z.array(z.string()).default(DEFAULT_WORKSPACE_POLICY.delete_allowed_globs)
+}).passthrough();
+
 export const RepoReaderConfigSchema = z.object({
   repos: z.array(RepoConfigSchema).default([]),
-  limits: LimitsConfigSchema.default({})
+  limits: LimitsConfigSchema.default({}),
+  workspace: WorkspacePolicyConfigSchema.default(DEFAULT_WORKSPACE_POLICY)
 }).passthrough();
 
 export type WritePolicyConfigDocument = z.input<typeof WritePolicyConfigSchema>;
@@ -61,4 +78,5 @@ export type RepoConfig = {
 export type RepoReaderConfig = {
   repos: RepoConfig[];
   limits: z.input<typeof LimitsConfigSchema>;
+  workspace?: z.input<typeof WorkspacePolicyConfigSchema>;
 };

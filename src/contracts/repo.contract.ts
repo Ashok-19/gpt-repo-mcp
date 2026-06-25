@@ -12,6 +12,9 @@ export const RepoTreeInputSchema = RepoInputSchema.extend({
   respect_default_excludes: z.boolean().optional(),
   include_generated: z.boolean().optional(),
   include_dependencies: z.boolean().optional(),
+  include_nested_repos: z.boolean().optional(),
+  include_globs: z.array(z.string()).optional(),
+  exclude_globs: z.array(z.string()).optional(),
   cursor: z.string().optional()
 });
 

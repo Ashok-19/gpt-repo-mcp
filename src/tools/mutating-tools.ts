@@ -14,7 +14,13 @@ export const MUTATING_TOOL_NAMES = [
   "repo_write_commit",
   "repo_write_stage_commit",
   "repo_write_recover",
-  "repo_cleanup_paths"
+  "repo_cleanup_paths",
+  "workspace_exec",
+  "workspace_import_file",
+  "workspace_write_file",
+  "workspace_apply_patch",
+  "workspace_make_dir",
+  "workspace_delete_paths"
 ] as const satisfies readonly ToolName[];
 
 const MUTATING_TOOL_NAME_SET = new Set<ToolName>(MUTATING_TOOL_NAMES);

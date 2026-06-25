@@ -2,8 +2,9 @@ import { readFile } from "node:fs/promises";
 import { realpath } from "node:fs/promises";
 import { z } from "zod";
 import { DEFAULT_LIMITS } from "../policies/limits.js";
+import { DEFAULT_WORKSPACE_POLICY } from "../policies/workspace-defaults.js";
 import { RepoReaderError } from "../runtime/errors.js";
-import { OperationsPolicyConfigSchema, WritePolicyConfigSchema } from "../config/schema.js";
+import { OperationsPolicyConfigSchema, WorkspacePolicyConfigSchema, WritePolicyConfigSchema } from "../config/schema.js";
 
 const RepoConfigSchema = z.object({
   repo_id: z.string().min(1),
@@ -19,7 +20,8 @@ const ConfigSchema = z.object({
     max_files: z.number().int().positive().optional(),
     max_bytes_per_file: z.number().int().positive().optional(),
     max_total_bytes: z.number().int().positive().optional()
-  }).default({})
+  }).default({}),
+  workspace: WorkspacePolicyConfigSchema.default(DEFAULT_WORKSPACE_POLICY)
 });
 
 export type RepoConfig = z.infer<typeof RepoConfigSchema>;
@@ -29,7 +31,8 @@ type RepoReaderConfigInput = z.input<typeof ConfigSchema>;
 export class RootRegistry {
   private constructor(
     private readonly repos: RepoConfig[],
-    readonly limits: Required<RepoReaderConfig["limits"]>
+    readonly limits: Required<RepoReaderConfig["limits"]>,
+    readonly workspace: Required<RepoReaderConfig["workspace"]>
   ) {}
 
   static async fromConfig(config: RepoReaderConfigInput): Promise<RootRegistry> {
@@ -38,11 +41,21 @@ export class RootRegistry {
     for (const repo of parsed.repos) {
       repos.push({ ...repo, root: await realpath(repo.root) });
     }
-    return new RootRegistry(repos, {
-      max_files: parsed.limits.max_files ?? DEFAULT_LIMITS.max_files,
-      max_bytes_per_file: parsed.limits.max_bytes_per_file ?? DEFAULT_LIMITS.max_bytes_per_file,
-      max_total_bytes: parsed.limits.max_total_bytes ?? DEFAULT_LIMITS.max_total_bytes
-    });
+    return new RootRegistry(
+      repos,
+      {
+        max_files: parsed.limits.max_files ?? DEFAULT_LIMITS.max_files,
+        max_bytes_per_file: parsed.limits.max_bytes_per_file ?? DEFAULT_LIMITS.max_bytes_per_file,
+        max_total_bytes: parsed.limits.max_total_bytes ?? DEFAULT_LIMITS.max_total_bytes
+      },
+      {
+        ...DEFAULT_WORKSPACE_POLICY,
+        ...parsed.workspace,
+        exec_allowed_roots: parsed.workspace.exec_allowed_roots ?? [...DEFAULT_WORKSPACE_POLICY.exec_allowed_roots],
+        exec_write_allowed_globs: parsed.workspace.exec_write_allowed_globs ?? [...DEFAULT_WORKSPACE_POLICY.exec_write_allowed_globs],
+        delete_allowed_globs: parsed.workspace.delete_allowed_globs ?? [...DEFAULT_WORKSPACE_POLICY.delete_allowed_globs]
+      }
+    );
   }
 
   static async fromFile(configPath: string): Promise<RootRegistry> {

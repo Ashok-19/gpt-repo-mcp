@@ -32,6 +32,21 @@ import {
   writeFileHandler,
   writeHandoffHandler,
   policyExplainHandler,
+  workspaceApplyPatchHandler,
+  workspaceDeletePathsHandler,
+  workspaceExecHandler,
+  workspaceExportFileHandler,
+  workspaceFileInfoHandler,
+  workspaceGitDiffHandler,
+  workspaceGitStatusHandler,
+  workspaceImportFileHandler,
+  workspaceMakeDirHandler,
+  workspacePolicyExplainHandler,
+  workspaceReadFileHandler,
+  workspaceReadManyHandler,
+  workspaceSearchHandler,
+  workspaceTreeHandler,
+  workspaceWriteFileHandler,
   writeStageHandler,
   writeUnstageHandler,
   type ToolHandler
@@ -335,5 +350,140 @@ export const toolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.repo_write_handoff.output,
     annotations: writeAnnotations,
     handler: writeHandoffHandler
+  },
+  {
+    name: "workspace_exec",
+    title: "Run approved workspace command",
+    description: descriptions.workspace_exec,
+    inputSchema: toolContracts.workspace_exec.input,
+    outputSchema: toolContracts.workspace_exec.output,
+    annotations: writeAnnotations,
+    handler: workspaceExecHandler
+  },
+  {
+    name: "workspace_export_file",
+    title: "Export repo file artifact",
+    description: descriptions.workspace_export_file,
+    inputSchema: toolContracts.workspace_export_file.input,
+    outputSchema: toolContracts.workspace_export_file.output,
+    annotations: readOnlyAnnotations,
+    handler: workspaceExportFileHandler
+  },
+  {
+    name: "workspace_import_file",
+    title: "Import artifact into workspace",
+    description: descriptions.workspace_import_file,
+    inputSchema: toolContracts.workspace_import_file.input,
+    outputSchema: toolContracts.workspace_import_file.output,
+    annotations: writeAnnotations,
+    handler: workspaceImportFileHandler
+  },
+  {
+    name: "workspace_file_info",
+    title: "Inspect workspace file metadata",
+    description: descriptions.workspace_file_info,
+    inputSchema: toolContracts.workspace_file_info.input,
+    outputSchema: toolContracts.workspace_file_info.output,
+    annotations: readOnlyAnnotations,
+    handler: workspaceFileInfoHandler
+  },
+  {
+    name: "workspace_tree",
+    title: "Inspect workspace tree",
+    description: descriptions.workspace_tree,
+    inputSchema: toolContracts.workspace_tree.input,
+    outputSchema: toolContracts.workspace_tree.output,
+    annotations: readOnlyAnnotations,
+    handler: workspaceTreeHandler
+  },
+  {
+    name: "workspace_read_file",
+    title: "Read workspace text file",
+    description: descriptions.workspace_read_file,
+    inputSchema: toolContracts.workspace_read_file.input,
+    outputSchema: toolContracts.workspace_read_file.output,
+    annotations: readOnlyAnnotations,
+    handler: workspaceReadFileHandler
+  },
+  {
+    name: "workspace_read_many",
+    title: "Read bounded workspace files",
+    description: descriptions.workspace_read_many,
+    inputSchema: toolContracts.workspace_read_many.input,
+    outputSchema: toolContracts.workspace_read_many.output,
+    annotations: readOnlyAnnotations,
+    handler: workspaceReadManyHandler
+  },
+  {
+    name: "workspace_search",
+    title: "Search workspace text",
+    description: descriptions.workspace_search,
+    inputSchema: toolContracts.workspace_search.input,
+    outputSchema: toolContracts.workspace_search.output,
+    annotations: readOnlyAnnotations,
+    handler: workspaceSearchHandler
+  },
+  {
+    name: "workspace_write_file",
+    title: "Write workspace scratch file",
+    description: descriptions.workspace_write_file,
+    inputSchema: toolContracts.workspace_write_file.input,
+    outputSchema: toolContracts.workspace_write_file.output,
+    annotations: writeAnnotations,
+    handler: workspaceWriteFileHandler
+  },
+  {
+    name: "workspace_apply_patch",
+    title: "Apply workspace patch",
+    description: descriptions.workspace_apply_patch,
+    inputSchema: toolContracts.workspace_apply_patch.input,
+    outputSchema: toolContracts.workspace_apply_patch.output,
+    annotations: writeAnnotations,
+    handler: workspaceApplyPatchHandler
+  },
+  {
+    name: "workspace_make_dir",
+    title: "Create workspace directory",
+    description: descriptions.workspace_make_dir,
+    inputSchema: toolContracts.workspace_make_dir.input,
+    outputSchema: toolContracts.workspace_make_dir.output,
+    annotations: writeAnnotations,
+    handler: workspaceMakeDirHandler
+  },
+  {
+    name: "workspace_delete_paths",
+    title: "Delete workspace generated paths",
+    description: descriptions.workspace_delete_paths,
+    inputSchema: toolContracts.workspace_delete_paths.input,
+    outputSchema: toolContracts.workspace_delete_paths.output,
+    annotations: writeAnnotations,
+    handler: workspaceDeletePathsHandler
+  },
+  {
+    name: "workspace_git_status",
+    title: "Read workspace git status",
+    description: descriptions.workspace_git_status,
+    inputSchema: toolContracts.workspace_git_status.input,
+    outputSchema: toolContracts.workspace_git_status.output,
+    annotations: readOnlyAnnotations,
+    handler: workspaceGitStatusHandler
+  },
+  {
+    name: "workspace_git_diff",
+    title: "Read workspace git diff",
+    description: descriptions.workspace_git_diff,
+    inputSchema: toolContracts.workspace_git_diff.input,
+    outputSchema: toolContracts.workspace_git_diff.output,
+    annotations: readOnlyAnnotations,
+    handler: workspaceGitDiffHandler
+  },
+  {
+    name: "workspace_policy_explain",
+    title: "Explain workspace policy",
+    description: descriptions.workspace_policy_explain,
+    inputSchema: toolContracts.workspace_policy_explain.input,
+    outputSchema: toolContracts.workspace_policy_explain.output,
+    annotations: readOnlyAnnotations,
+    handler: workspacePolicyExplainHandler
   }
 ];
