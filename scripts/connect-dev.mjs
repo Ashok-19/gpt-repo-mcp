@@ -7,7 +7,10 @@ import process from "node:process";
 const CONFIG_PATH = "./config.local.json";
 const PORT = "8787";
 const NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels";
-const publicPathToken = randomBytes(16).toString("hex");
+const publicPathToken =
+  process.env.GPT_REPO_PUBLIC_PATH_TOKEN ??
+  process.env.REPO_READER_PUBLIC_PATH_TOKEN ??
+  randomBytes(16).toString("hex");
 
 const children = [];
 let shuttingDown = false;
