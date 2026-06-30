@@ -25,6 +25,7 @@ import { WriteChangesService } from "../services/write-changes-service.js";
 import { WritePolicy } from "../services/write-policy.js";
 import { WorkspacePolicy } from "../services/workspace-policy.js";
 import { WorkspaceService } from "../services/workspace-service.js";
+import { WorkspaceAgentService } from "../services/workspace-agent-service.js";
 import { OperationReceiptService } from "../services/operation-receipt-service.js";
 import { createErrorEnvelope, createSuccessEnvelope } from "../runtime/result-envelope.js";
 import { toRepoReaderError } from "../runtime/errors.js";
@@ -48,13 +49,19 @@ import type { CleanupPathsInput } from "../contracts/cleanup.contract.js";
 import type { HandoffInput } from "../contracts/handoff.contract.js";
 import type {
   WorkspaceApplyPatchInput,
+  WorkspaceAgentSessionInput,
+  WorkspaceClaimTaskInput,
   WorkspaceDeletePathsInput,
   WorkspaceExecInput,
   WorkspaceExportFileInput,
   WorkspaceFileInfoInput,
   WorkspaceImportFileInput,
   WorkspaceMakeDirInput,
+  WorkspaceOfficialLockInput,
+  WorkspaceOfficialUnlockInput,
   WorkspacePolicyExplainInput,
+  WorkspaceReapProcessesInput,
+  WorkspaceReleaseTaskInput,
   WorkspaceWriteFileInput
 } from "../contracts/workspace.contract.js";
 
@@ -422,6 +429,48 @@ export const workspaceExecHandler: ToolHandler = async (input, context) => safeT
   const result = await workspaceService(repo.root, context).exec(args);
   audit({ tool: "workspace_exec", repo_id: args.repo_id, counts: { exit_code: result.exit_code ?? -1 }, truncated: result.stdout_truncated || result.stderr_truncated });
   return createSuccessEnvelope(result, result.timed_out ? `Command timed out in ${result.duration_ms}ms.` : `Command exited with ${result.exit_code}.`);
+});
+
+export const workspaceAgentSessionHandler: ToolHandler = async (input, context) => safeTool<WorkspaceAgentSessionInput>("workspace_agent_session", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new WorkspaceAgentService(repo.root).session(args);
+  audit({ tool: "workspace_agent_session", repo_id: args.repo_id, paths: [result.task_scratch_path ?? result.scratch_root], agent_id: result.agent_id });
+  return createSuccessEnvelope(result, `Workspace agent ${result.agent_id} is ready.`);
+});
+
+export const workspaceClaimTaskHandler: ToolHandler = async (input, context) => safeTool<WorkspaceClaimTaskInput>("workspace_claim_task", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new WorkspaceAgentService(repo.root).claimTask(args);
+  audit({ tool: "workspace_claim_task", repo_id: args.repo_id, paths: [result.lock_path], agent_id: result.agent_id, warnings: result.acquired ? undefined : ["LOCK_BUSY"] });
+  return createSuccessEnvelope(result, result.acquired ? `Claimed ${result.resource}.` : `${result.resource} is already claimed.`);
+});
+
+export const workspaceReleaseTaskHandler: ToolHandler = async (input, context) => safeTool<WorkspaceReleaseTaskInput>("workspace_release_task", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new WorkspaceAgentService(repo.root).releaseTask(args);
+  audit({ tool: "workspace_release_task", repo_id: args.repo_id, paths: [result.lock_path], agent_id: result.agent_id, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.released ? `Released ${result.resource}.` : `Did not release ${result.resource}.`, { warnings: result.warnings });
+});
+
+export const workspaceAcquireOfficialLockHandler: ToolHandler = async (input, context) => safeTool<WorkspaceOfficialLockInput>("workspace_acquire_official_lock", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new WorkspaceAgentService(repo.root).acquireOfficialLock(args);
+  audit({ tool: "workspace_acquire_official_lock", repo_id: args.repo_id, paths: [result.lock_path], agent_id: result.agent_id, warnings: result.acquired ? undefined : ["LOCK_BUSY"] });
+  return createSuccessEnvelope(result, result.acquired ? `Official lock acquired for ${result.resource}.` : `Official lock is already held for ${result.resource}.`);
+});
+
+export const workspaceReleaseOfficialLockHandler: ToolHandler = async (input, context) => safeTool<WorkspaceOfficialUnlockInput>("workspace_release_official_lock", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new WorkspaceAgentService(repo.root).releaseOfficialLock(args);
+  audit({ tool: "workspace_release_official_lock", repo_id: args.repo_id, paths: [result.lock_path], agent_id: result.agent_id, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.released ? `Official lock released for ${result.resource}.` : `Did not release official lock for ${result.resource}.`, { warnings: result.warnings });
+});
+
+export const workspaceReapProcessesHandler: ToolHandler = async (input, context) => safeTool<WorkspaceReapProcessesInput>("workspace_reap_processes", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new WorkspaceAgentService(repo.root).reapProcesses(args);
+  audit({ tool: "workspace_reap_processes", repo_id: args.repo_id, counts: { candidates: result.candidates.length, killed: result.killed.length }, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Found ${result.candidates.length} stale process candidates.` : `Stopped ${result.killed.length} stale processes.`, { warnings: result.warnings });
 });
 
 export const workspaceExportFileHandler: ToolHandler = async (input, context) => safeTool<WorkspaceExportFileInput>("workspace_export_file", input, context, async (args) => {

@@ -35,6 +35,9 @@ import {
   workspaceApplyPatchHandler,
   workspaceCleanupPathsHandler,
   workspaceCreateFileArtifactHandler,
+  workspaceAcquireOfficialLockHandler,
+  workspaceAgentSessionHandler,
+  workspaceClaimTaskHandler,
   workspaceDeletePathsHandler,
   workspaceExecHandler,
   workspaceExportFileHandler,
@@ -44,6 +47,9 @@ import {
   workspaceImportFileHandler,
   workspaceMakeDirHandler,
   workspacePolicyExplainHandler,
+  workspaceReapProcessesHandler,
+  workspaceReleaseOfficialLockHandler,
+  workspaceReleaseTaskHandler,
   workspaceReadFileHandler,
   workspaceReadManyHandler,
   workspaceSearchHandler,
@@ -64,7 +70,26 @@ export type ToolDefinition = {
   handler: ToolHandler;
 };
 
-export const toolCatalog: ToolDefinition[] = [
+const hiddenPublicToolNames = new Set<ToolName>([
+  "repo_git_stage",
+  "repo_git_unstage",
+  "repo_git_restore_paths",
+  "repo_git_commit",
+  "repo_write_stage",
+  "repo_write_unstage",
+  "repo_write_commit",
+  "repo_cleanup_paths",
+  "workspace_export_file",
+  "workspace_tree",
+  "workspace_read_file",
+  "workspace_read_many",
+  "workspace_search",
+  "workspace_delete_paths",
+  "workspace_git_status",
+  "workspace_git_diff"
+]);
+
+const fullToolCatalog: ToolDefinition[] = [
   {
     name: "repo_list_roots",
     title: "List approved repositories",
@@ -363,6 +388,60 @@ export const toolCatalog: ToolDefinition[] = [
     handler: workspaceExecHandler
   },
   {
+    name: "workspace_agent_session",
+    title: "Create workspace agent session",
+    description: descriptions.workspace_agent_session,
+    inputSchema: toolContracts.workspace_agent_session.input,
+    outputSchema: toolContracts.workspace_agent_session.output,
+    annotations: writeAnnotations,
+    handler: workspaceAgentSessionHandler
+  },
+  {
+    name: "workspace_claim_task",
+    title: "Claim workspace task",
+    description: descriptions.workspace_claim_task,
+    inputSchema: toolContracts.workspace_claim_task.input,
+    outputSchema: toolContracts.workspace_claim_task.output,
+    annotations: writeAnnotations,
+    handler: workspaceClaimTaskHandler
+  },
+  {
+    name: "workspace_release_task",
+    title: "Release workspace task claim",
+    description: descriptions.workspace_release_task,
+    inputSchema: toolContracts.workspace_release_task.input,
+    outputSchema: toolContracts.workspace_release_task.output,
+    annotations: writeAnnotations,
+    handler: workspaceReleaseTaskHandler
+  },
+  {
+    name: "workspace_acquire_official_lock",
+    title: "Acquire official workspace lock",
+    description: descriptions.workspace_acquire_official_lock,
+    inputSchema: toolContracts.workspace_acquire_official_lock.input,
+    outputSchema: toolContracts.workspace_acquire_official_lock.output,
+    annotations: writeAnnotations,
+    handler: workspaceAcquireOfficialLockHandler
+  },
+  {
+    name: "workspace_release_official_lock",
+    title: "Release official workspace lock",
+    description: descriptions.workspace_release_official_lock,
+    inputSchema: toolContracts.workspace_release_official_lock.input,
+    outputSchema: toolContracts.workspace_release_official_lock.output,
+    annotations: writeAnnotations,
+    handler: workspaceReleaseOfficialLockHandler
+  },
+  {
+    name: "workspace_reap_processes",
+    title: "Reap stale workspace processes",
+    description: descriptions.workspace_reap_processes,
+    inputSchema: toolContracts.workspace_reap_processes.input,
+    outputSchema: toolContracts.workspace_reap_processes.output,
+    annotations: writeAnnotations,
+    handler: workspaceReapProcessesHandler
+  },
+  {
     name: "workspace_export_file",
     title: "Create compatibility file artifact",
     description: descriptions.workspace_export_file,
@@ -507,3 +586,7 @@ export const toolCatalog: ToolDefinition[] = [
     handler: workspacePolicyExplainHandler
   }
 ];
+
+export const toolCatalog: ToolDefinition[] = fullToolCatalog.filter(
+  (tool) => !hiddenPublicToolNames.has(tool.name)
+);

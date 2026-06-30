@@ -50,7 +50,8 @@ const GENERIC_ALLOWED = new Set([
   "zip",
   "unzip",
   "tar",
-  "git"
+  "git",
+  "timeout"
 ]);
 const GIT_ALLOWED = new Set(["status", "diff", "log", "rev-parse"]);
 const NPM_BLOCKED = new Set(["install", "i", "add", "update", "upgrade", "publish", "audit", "fund", "login"]);
@@ -91,9 +92,10 @@ export class WorkspaceService {
     const cwd = await this.resolveExistingDirectory(input.cwd ?? ".");
     const cmd = input.cmd;
     this.assertCommandAllowed(cmd);
-    await this.assertNoOutsideAbsolutePaths(cmd);
-    await this.assertPathLikeArgsInsideRoot(cmd);
-    await this.assertCommandPathEffects(cmd);
+    const policyCmd = this.unwrapCommandForPolicy(cmd);
+    await this.assertNoOutsideAbsolutePaths(policyCmd);
+    await this.assertPathLikeArgsInsideRoot(cwd.repoPath, policyCmd);
+    await this.assertCommandPathEffects(cwd.repoPath, policyCmd, input.agent_id);
 
     const timeoutSeconds = Math.min(
       input.timeout_seconds ?? this.policy.config.exec_default_timeout_seconds,
@@ -432,7 +434,10 @@ export class WorkspaceService {
     return join(this.root, repoPath);
   }
 
-  private assertCommandAllowed(cmd: string[]): void {
+  private assertCommandAllowed(cmd: string[], depth = 0): void {
+    if (depth > 3) {
+      throw new RepoReaderError("VALIDATION_ERROR", "Nested command wrappers are too deep.");
+    }
     const exe = basename(cmd[0] ?? "");
     if (!exe) {
       throw new RepoReaderError("VALIDATION_ERROR", "cmd must contain an executable.");
@@ -458,8 +463,18 @@ export class WorkspaceService {
     if (exe === "npx" && !cmd.includes("--no-install") && !cmd.includes("--offline")) {
       throw new RepoReaderError("OPERATIONS_DISABLED", "npx requires --no-install or --offline.");
     }
-    if ((exe === "bash" || exe === "sh") && (cmd.includes("-c") || cmd.length < 2 || cmd[1]?.startsWith("-"))) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", `${exe} may only run an explicit local script file.`);
+    if (exe === "timeout") {
+      this.assertCommandAllowed(parseTimeoutWrappedCommand(cmd), depth + 1);
+    }
+    if (exe === "bash" || exe === "sh") {
+      if (cmd[1] === "-lc") {
+        if (cmd.length !== 3) {
+          throw new RepoReaderError("OPERATIONS_DISABLED", `${exe} -lc must contain exactly one simple command string.`);
+        }
+        this.assertCommandAllowed(splitSimpleShellCommand(cmd[2] ?? ""), depth + 1);
+      } else if (cmd.includes("-c") || cmd.length < 2 || cmd[1]?.startsWith("-")) {
+        throw new RepoReaderError("OPERATIONS_DISABLED", `${exe} may only run an explicit local script file or a checked -lc command.`);
+      }
     }
     if (cmd.some((arg) => arg.includes("\0"))) {
       throw new RepoReaderError("VALIDATION_ERROR", "NUL bytes are not allowed in cmd.");
@@ -487,12 +502,15 @@ export class WorkspaceService {
     }
   }
 
-  private async assertPathLikeArgsInsideRoot(cmd: string[]): Promise<void> {
+  private async assertPathLikeArgsInsideRoot(cwdRepoPath: string, cmd: string[]): Promise<void> {
     for (const arg of cmd.slice(1)) {
       if (!isPathLikeArg(arg)) {
         continue;
       }
-      const repoPath = validateRepoPath(arg);
+      const repoPath = await this.normalizeCommandPathArg(cwdRepoPath, arg);
+      if (this.policy.isSecretPath(repoPath)) {
+        throw new RepoReaderError("SECRET_CANDIDATE_BLOCKED", `Secret candidate blocked: ${repoPath}`);
+      }
       const absolutePath = join(this.root, repoPath);
       try {
         const rootReal = await realpath(this.root);
@@ -509,23 +527,85 @@ export class WorkspaceService {
     }
   }
 
-  private async assertCommandPathEffects(cmd: string[]): Promise<void> {
+  private async assertCommandPathEffects(cwdRepoPath: string, cmd: string[], agentId?: string): Promise<void> {
     const exe = basename(cmd[0] ?? "");
     if (exe === "bash" || exe === "sh") {
       const script = cmd[1] ?? "";
-      const repoPath = validateRepoPath(script);
+      const repoPath = await this.normalizeCommandPathArg(cwdRepoPath, script);
       await this.sandbox.resolve(repoPath);
     }
     if (!MUTATING_FILE_COMMANDS.has(exe)) {
       return;
     }
     const pathArgs = cmd.slice(1).filter((arg) => !arg.startsWith("-"));
+    if (pathArgs.length === 0) {
+      throw new RepoReaderError("VALIDATION_ERROR", `${exe} requires at least one explicit path.`);
+    }
+    if (exe === "cp" && pathArgs.length < 2) {
+      throw new RepoReaderError("VALIDATION_ERROR", "cp requires at least one source and one destination.");
+    }
+    if (exe === "cp") {
+      for (const source of pathArgs.slice(0, -1)) {
+        const sourcePath = await this.normalizeCommandPathArg(cwdRepoPath, source);
+        if (this.policy.isSecretPath(sourcePath)) {
+          throw new RepoReaderError("SECRET_CANDIDATE_BLOCKED", `Secret candidate blocked: ${sourcePath}`);
+        }
+        await this.sandbox.resolve(sourcePath);
+      }
+      this.policy.assertWritePath(await this.normalizeCommandPathArg(cwdRepoPath, pathArgs[pathArgs.length - 1] ?? ""));
+      return;
+    }
     for (const arg of pathArgs) {
-      if (arg === "/" || arg === ".") {
+      const repoPath = await this.normalizeCommandPathArg(cwdRepoPath, arg);
+      if (arg === "/" || arg === "." || repoPath === ".") {
         throw new RepoReaderError("OPERATIONS_DISABLED", `Unsafe ${exe} target rejected: ${arg}`);
       }
-      this.policy.assertWritePath(arg);
+      if (exe === "rm") {
+        this.assertAgentScratchPath(repoPath, agentId);
+      } else {
+        this.policy.assertWritePath(repoPath);
+      }
     }
+  }
+
+  private unwrapCommandForPolicy(cmd: string[], depth = 0): string[] {
+    if (depth > 3) {
+      throw new RepoReaderError("VALIDATION_ERROR", "Nested command wrappers are too deep.");
+    }
+    const exe = basename(cmd[0] ?? "");
+    if (exe === "timeout") {
+      return this.unwrapCommandForPolicy(parseTimeoutWrappedCommand(cmd), depth + 1);
+    }
+    if ((exe === "bash" || exe === "sh") && cmd[1] === "-lc") {
+      return this.unwrapCommandForPolicy(splitSimpleShellCommand(cmd[2] ?? ""), depth + 1);
+    }
+    return cmd;
+  }
+
+  private async normalizeCommandPathArg(cwdRepoPath: string, arg: string): Promise<string> {
+    if (hasTraversalSegment(arg)) {
+      throw new RepoReaderError("PATH_TRAVERSAL_REJECTED", `Path traversal is not allowed: ${arg}`);
+    }
+    if (isAbsolute(arg)) {
+      const rootReal = await realpath(this.root);
+      const candidate = await realpath(arg).catch(() => resolve(arg));
+      if (!isWithin(rootReal, candidate)) {
+        throw new RepoReaderError("ABSOLUTE_PATH_REJECTED", `Absolute path is outside approved repository: ${arg}`);
+      }
+      return normalizeRelative(relative(rootReal, candidate));
+    }
+    return validateRepoPath(cwdRepoPath === "." ? arg : `${cwdRepoPath}/${arg}`);
+  }
+
+  private assertAgentScratchPath(repoPath: string, agentId?: string): void {
+    if (!agentId) {
+      throw new RepoReaderError("OPERATIONS_DISABLED", "rm through workspace_exec requires agent_id and is limited to that agent scratch directory.");
+    }
+    const agentRoot = `scratch/agents/${agentId}`;
+    if (repoPath === agentRoot || !repoPath.startsWith(`${agentRoot}/`)) {
+      throw new RepoReaderError("WRITE_NOT_ALLOWED_GLOB", `rm is limited to ${agentRoot}/ paths.`);
+    }
+    this.policy.assertDeletePath(repoPath);
   }
 
   private async isTracked(repoPath: string): Promise<boolean> {
@@ -599,6 +679,91 @@ function isPathLikeArg(arg: string): boolean {
   return arg.startsWith(".")
     || arg.includes("/")
     || PATH_LIKE_EXTENSIONS.has(extname(arg).toLowerCase());
+}
+
+function parseTimeoutWrappedCommand(cmd: string[]): string[] {
+  let index = 1;
+  while (index < cmd.length) {
+    const arg = cmd[index] ?? "";
+    if (arg === "--") {
+      index += 1;
+      break;
+    }
+    if (arg === "--foreground" || arg === "--preserve-status" || arg === "--verbose") {
+      index += 1;
+      continue;
+    }
+    if (arg === "-s" || arg === "--signal" || arg === "-k" || arg === "--kill-after") {
+      index += 2;
+      continue;
+    }
+    if (arg.startsWith("--signal=") || arg.startsWith("--kill-after=")) {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("-")) {
+      throw new RepoReaderError("OPERATIONS_DISABLED", `Unsupported timeout option: ${arg}`);
+    }
+    index += 1;
+    break;
+  }
+  const wrapped = cmd.slice(index);
+  if (wrapped.length === 0) {
+    throw new RepoReaderError("VALIDATION_ERROR", "timeout requires a wrapped command.");
+  }
+  return wrapped;
+}
+
+function splitSimpleShellCommand(command: string): string[] {
+  if (command.trim().length === 0) {
+    throw new RepoReaderError("VALIDATION_ERROR", "Shell command string must not be empty.");
+  }
+  if (/[\0\r\n;&|`$<>]/.test(command)) {
+    throw new RepoReaderError("OPERATIONS_DISABLED", "Shell control operators and substitutions are blocked.");
+  }
+  const args: string[] = [];
+  let current = "";
+  let quote: "'" | "\"" | undefined;
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index] ?? "";
+    if (char === "\\") {
+      throw new RepoReaderError("OPERATIONS_DISABLED", "Backslash escaping is not allowed in shell command strings.");
+    }
+    if (quote) {
+      if (char === quote) {
+        quote = undefined;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+    if (char === "'" || char === "\"") {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (current.length > 0) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += char;
+  }
+  if (quote) {
+    throw new RepoReaderError("VALIDATION_ERROR", "Unterminated shell quote.");
+  }
+  if (current.length > 0) {
+    args.push(current);
+  }
+  if (args.length === 0) {
+    throw new RepoReaderError("VALIDATION_ERROR", "Shell command string must contain an executable.");
+  }
+  return args;
+}
+
+function hasTraversalSegment(path: string): boolean {
+  return path.replaceAll("\\", "/").split("/").includes("..");
 }
 
 function isWithin(rootPath: string, targetPath: string): boolean {

@@ -58,16 +58,8 @@ describe("tool catalog contracts", () => {
       "repo_git_status",
       "repo_git_diff",
       "repo_git_review",
-      "repo_git_stage",
-      "repo_git_unstage",
-      "repo_git_restore_paths",
-      "repo_git_commit",
-      "repo_write_stage",
-      "repo_write_unstage",
-      "repo_write_commit",
       "repo_write_stage_commit",
       "repo_write_recover",
-      "repo_cleanup_paths",
       "repo_project_brief",
       "repo_task_inventory",
       "repo_decision_memory",
@@ -81,21 +73,19 @@ describe("tool catalog contracts", () => {
       "repo_write_changes",
       "repo_write_handoff",
       "workspace_exec",
-      "workspace_export_file",
+      "workspace_agent_session",
+      "workspace_claim_task",
+      "workspace_release_task",
+      "workspace_acquire_official_lock",
+      "workspace_release_official_lock",
+      "workspace_reap_processes",
       "workspace_create_file_artifact",
       "workspace_import_file",
       "workspace_file_info",
-      "workspace_tree",
-      "workspace_read_file",
-      "workspace_read_many",
-      "workspace_search",
       "workspace_write_file",
       "workspace_apply_patch",
       "workspace_make_dir",
-      "workspace_delete_paths",
       "workspace_cleanup_paths",
-      "workspace_git_status",
-      "workspace_git_diff",
       "workspace_policy_explain"
     ]);
 
@@ -119,22 +109,19 @@ describe("tool catalog contracts", () => {
       "repo_write_changes",
       "repo_write_handoff",
       "repo_write_codex_task",
-      "repo_git_stage",
-      "repo_git_unstage",
-      "repo_git_restore_paths",
-      "repo_git_commit",
-      "repo_write_stage",
-      "repo_write_unstage",
-      "repo_write_commit",
       "repo_write_stage_commit",
       "repo_write_recover",
-      "repo_cleanup_paths",
       "workspace_exec",
+      "workspace_agent_session",
+      "workspace_claim_task",
+      "workspace_release_task",
+      "workspace_acquire_official_lock",
+      "workspace_release_official_lock",
+      "workspace_reap_processes",
       "workspace_import_file",
       "workspace_write_file",
       "workspace_apply_patch",
       "workspace_make_dir",
-      "workspace_delete_paths",
       "workspace_cleanup_paths"
     ]);
     const writeFile = toolCatalog.find((tool) => tool.name === "repo_write_file");
@@ -195,12 +182,6 @@ describe("tool catalog contracts", () => {
     expect(recover?.inputSchema).toBe(GitRecoverInputSchema);
     expect(recover?.outputSchema).toBe(GitRecoverResultSchema);
     expect(recover?.annotations).toEqual(writeAnnotations);
-    const restorePaths = toolCatalog.find((tool) => tool.name === "repo_git_restore_paths");
-    expect(restorePaths).toBeDefined();
-    expect(restorePaths?.inputSchema).toBe(GitRestorePathsInputSchema);
-    expect(restorePaths?.outputSchema).toBe(GitRestorePathsResultSchema);
-    expect(restorePaths?.annotations).toEqual(writeAnnotations);
-
     expect(toolContracts.repo_write_stage.input).toBe(toolContracts.repo_git_stage.input);
     expect(toolContracts.repo_write_stage.output).toBe(toolContracts.repo_git_stage.output);
     expect(toolContracts.repo_write_unstage.input).toBe(toolContracts.repo_git_unstage.input);
@@ -722,7 +703,23 @@ describe("tool catalog contracts", () => {
   });
 
   test("every tool uses the central contract objects", () => {
-    expect(toolCatalog.map((tool) => tool.name).sort()).toEqual(Object.keys(toolContracts).sort());
+    const exposedNames = toolCatalog.map((tool) => tool.name);
+    expect(exposedNames).not.toContain("repo_git_stage");
+    expect(exposedNames).not.toContain("repo_git_unstage");
+    expect(exposedNames).not.toContain("repo_git_restore_paths");
+    expect(exposedNames).not.toContain("repo_git_commit");
+    expect(exposedNames).not.toContain("repo_write_stage");
+    expect(exposedNames).not.toContain("repo_write_unstage");
+    expect(exposedNames).not.toContain("repo_write_commit");
+    expect(exposedNames).not.toContain("repo_cleanup_paths");
+    expect(exposedNames).not.toContain("workspace_export_file");
+    expect(exposedNames).not.toContain("workspace_tree");
+    expect(exposedNames).not.toContain("workspace_read_file");
+    expect(exposedNames).not.toContain("workspace_read_many");
+    expect(exposedNames).not.toContain("workspace_search");
+    expect(exposedNames).not.toContain("workspace_delete_paths");
+    expect(exposedNames).not.toContain("workspace_git_status");
+    expect(exposedNames).not.toContain("workspace_git_diff");
 
     for (const tool of toolCatalog) {
       const contract = toolContracts[tool.name];
@@ -984,7 +981,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": true,
           },
-          "description": "Use this when the user asks to review current git changes, recover bad write-tool edits, clean up generated artifacts, prepare staging, or plan a local commit without mutating anything. Workflow hub that returns status, diff summary, warnings, and ready-to-run composite payloads for repo_write_stage_commit and repo_write_recover plus low-level fallback payloads.",
+          "description": "Use this when the user asks to review current git changes, recover bad write-tool edits, clean up generated artifacts, prepare staging, or plan a local commit without mutating anything. Workflow hub that returns status, diff summary, warnings, and ready-to-run composite payloads for repo_write_stage_commit and repo_write_recover.",
           "inputKeys": [
             "max_files",
             "mode",
@@ -1002,192 +999,6 @@ describe("tool catalog contracts", () => {
             "recommendation",
           ],
           "title": "Plan git review",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when compatibility with the git-prefixed staging alias is needed; prefer repo_write_stage for ChatGPT workflows. Stages explicit repo-relative paths only, requires user approval and expected HEAD, and never runs shell commands.",
-          "inputKeys": [
-            "dry_run",
-            "expected_head_sha",
-            "paths",
-            "reason",
-            "repo_id",
-          ],
-          "name": "repo_git_stage",
-          "outputKeys": [
-            "dry_run",
-            "head_sha",
-            "ok",
-            "skipped",
-            "staged_paths",
-            "warnings",
-          ],
-          "title": "Stage explicit git paths",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when compatibility with the git-prefixed unstaging alias is needed; prefer repo_write_unstage for ChatGPT workflows. Unstages explicit repo-relative paths only, requires user approval and expected HEAD, and never runs shell commands.",
-          "inputKeys": [
-            "dry_run",
-            "expected_head_sha",
-            "paths",
-            "reason",
-            "repo_id",
-          ],
-          "name": "repo_git_unstage",
-          "outputKeys": [
-            "dry_run",
-            "head_sha",
-            "ok",
-            "skipped",
-            "unstaged_paths",
-            "warnings",
-          ],
-          "title": "Unstage explicit git paths",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when the user explicitly asks to recover bad unstaged worktree changes for reviewed explicit repo-relative paths. Runs only git restore -- <paths>, requires expected HEAD, does not unstage, stage, commit, reset, checkout, or run shell commands.",
-          "inputKeys": [
-            "dry_run",
-            "expected_head_sha",
-            "paths",
-            "reason",
-            "repo_id",
-          ],
-          "name": "repo_git_restore_paths",
-          "outputKeys": [
-            "dry_run",
-            "head_sha",
-            "ok",
-            "restored_paths",
-            "skipped",
-            "warnings",
-          ],
-          "title": "Restore explicit worktree paths",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when compatibility with the git-prefixed commit alias is needed; prefer repo_write_commit for ChatGPT workflows. Creates a local-only commit from exact staged paths, requires user approval and expected HEAD, does not push, and never runs shell commands.",
-          "inputKeys": [
-            "dry_run",
-            "expected_head_sha",
-            "expected_staged_paths",
-            "message",
-            "reason",
-            "repo_id",
-          ],
-          "name": "repo_git_commit",
-          "outputKeys": [
-            "commit_sha",
-            "committed_paths",
-            "dry_run",
-            "head_after",
-            "head_before",
-            "ok",
-            "warnings",
-          ],
-          "title": "Create local git commit",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when the user explicitly asks to stage reviewed repo-relative paths separately or granular control is needed; prefer repo_write_stage_commit after repo_git_review for normal reviewed commits. Requires user approval, expected HEAD, explicit paths, and never runs shell commands.",
-          "inputKeys": [
-            "dry_run",
-            "expected_head_sha",
-            "paths",
-            "reason",
-            "repo_id",
-          ],
-          "name": "repo_write_stage",
-          "outputKeys": [
-            "dry_run",
-            "head_sha",
-            "ok",
-            "skipped",
-            "staged_paths",
-            "warnings",
-          ],
-          "title": "Stage reviewed paths",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when the user explicitly asks to unstage reviewed repo-relative paths separately or granular recovery control is needed; prefer repo_write_recover after repo_git_review for normal reviewed recovery. Requires user approval, expected HEAD, explicit paths, and never runs shell commands.",
-          "inputKeys": [
-            "dry_run",
-            "expected_head_sha",
-            "paths",
-            "reason",
-            "repo_id",
-          ],
-          "name": "repo_write_unstage",
-          "outputKeys": [
-            "dry_run",
-            "head_sha",
-            "ok",
-            "skipped",
-            "unstaged_paths",
-            "warnings",
-          ],
-          "title": "Unstage reviewed paths",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when the user explicitly asks to create a local-only commit from already staged reviewed paths, or staged-only flow requires a commit without staging; prefer repo_write_stage_commit after repo_git_review for normal reviewed commits. Requires user approval, exact staged path verification, expected HEAD, does not push, and never runs shell commands.",
-          "inputKeys": [
-            "dry_run",
-            "expected_head_sha",
-            "expected_staged_paths",
-            "message",
-            "reason",
-            "repo_id",
-          ],
-          "name": "repo_write_commit",
-          "outputKeys": [
-            "commit_sha",
-            "committed_paths",
-            "dry_run",
-            "head_after",
-            "head_before",
-            "ok",
-            "warnings",
-          ],
-          "title": "Create reviewed local commit",
         },
         {
           "annotations": {
@@ -1251,30 +1062,6 @@ describe("tool catalog contracts", () => {
             "warnings",
           ],
           "title": "Recover reviewed paths",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when the user explicitly asks to delete generated repo-local artifacts or local ChatGPT artifacts separately, or granular cleanup control is needed; prefer repo_write_recover after repo_git_review for normal reviewed recovery. Requires user approval, explicit paths, refuses tracked files, and never runs shell commands or git clean.",
-          "inputKeys": [
-            "dry_run",
-            "paths",
-            "reason",
-            "repo_id",
-          ],
-          "name": "repo_cleanup_paths",
-          "outputKeys": [
-            "deleted",
-            "dry_run",
-            "ok",
-            "skipped",
-            "warnings",
-          ],
-          "title": "Clean up generated paths",
         },
         {
           "annotations": {
@@ -1646,6 +1433,7 @@ describe("tool catalog contracts", () => {
           },
           "description": "Use this when the user asks to run a local repository script or validation command. Runs an argv array inside an approved repository with policy checks and bounded output.",
           "inputKeys": [
+            "agent_id",
             "cmd",
             "cwd",
             "dry_run",
@@ -1658,6 +1446,7 @@ describe("tool catalog contracts", () => {
           ],
           "name": "workspace_exec",
           "outputKeys": [
+            "agent_id",
             "cmd",
             "cwd",
             "dry_run",
@@ -1673,29 +1462,164 @@ describe("tool catalog contracts", () => {
         },
         {
           "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
+            "destructiveHint": true,
+            "idempotentHint": false,
             "openWorldHint": false,
-            "readOnlyHint": true,
+            "readOnlyHint": false,
           },
-          "description": "Use this when compatibility requires the older file artifact name. Prefer workspace_create_file_artifact for creating a mounted reference to an approved repo-local file.",
+          "description": "Use this when a ChatGPT tab or worker needs its own workspace identity and scratch directory. Returns an agent id and scratch/agents path without touching official files.",
           "inputKeys": [
-            "max_bytes",
-            "path",
+            "agent_id",
+            "create_dirs",
+            "label",
+            "reason",
+            "repo_id",
+            "task_id",
+          ],
+          "name": "workspace_agent_session",
+          "outputKeys": [
+            "agent_id",
+            "instructions",
+            "label",
+            "ok",
+            "scratch_root",
+            "task_scratch_path",
+          ],
+          "title": "Create workspace agent session",
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "readOnlyHint": false,
+          },
+          "description": "Use this when an agent starts focused work on one task. Creates a lightweight per-task claim so parallel agents do not promote the same task concurrently.",
+          "inputKeys": [
+            "agent_id",
+            "reason",
+            "repo_id",
+            "task_id",
+            "ttl_seconds",
+          ],
+          "name": "workspace_claim_task",
+          "outputKeys": [
+            "acquired",
+            "agent_id",
+            "expires_at",
+            "lock_id",
+            "lock_path",
+            "ok",
+            "owner",
+            "resource",
+          ],
+          "title": "Claim workspace task",
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "readOnlyHint": false,
+          },
+          "description": "Use this when an agent is done with a task claim. Releases only the matching agent claim or lock id.",
+          "inputKeys": [
+            "agent_id",
+            "claim_id",
+            "reason",
+            "repo_id",
+            "task_id",
+          ],
+          "name": "workspace_release_task",
+          "outputKeys": [
+            "agent_id",
+            "lock_path",
+            "ok",
+            "owner",
+            "released",
+            "resource",
+            "warnings",
+          ],
+          "title": "Release workspace task claim",
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "readOnlyHint": false,
+          },
+          "description": "Use this when an agent is ready for a serialized official-write or promotion step. Acquires one repository-wide lock scope without changing official files.",
+          "inputKeys": [
+            "agent_id",
+            "reason",
+            "repo_id",
+            "scope",
+            "ttl_seconds",
+          ],
+          "name": "workspace_acquire_official_lock",
+          "outputKeys": [
+            "acquired",
+            "agent_id",
+            "expires_at",
+            "lock_id",
+            "lock_path",
+            "ok",
+            "owner",
+            "resource",
+          ],
+          "title": "Acquire official workspace lock",
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "readOnlyHint": false,
+          },
+          "description": "Use this when a serialized official-write or promotion step completes. Releases only the matching agent lock or lock id.",
+          "inputKeys": [
+            "agent_id",
+            "lock_id",
+            "reason",
+            "repo_id",
+            "scope",
+          ],
+          "name": "workspace_release_official_lock",
+          "outputKeys": [
+            "agent_id",
+            "lock_path",
+            "ok",
+            "owner",
+            "released",
+            "resource",
+            "warnings",
+          ],
+          "title": "Release official workspace lock",
+        },
+        {
+          "annotations": {
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "readOnlyHint": false,
+          },
+          "description": "Use this when stale repo-local Python or validation worker processes need inspection or cleanup. Defaults to dry-run and only considers processes whose cwd is inside the approved repo.",
+          "inputKeys": [
+            "dry_run",
+            "min_age_seconds",
             "reason",
             "repo_id",
           ],
-          "name": "workspace_export_file",
+          "name": "workspace_reap_processes",
           "outputKeys": [
-            "mime",
-            "mounted_path",
-            "path",
-            "resource_uri",
-            "sha256",
-            "size_bytes",
+            "candidates",
+            "dry_run",
+            "killed",
+            "ok",
             "warnings",
           ],
-          "title": "Create compatibility file artifact",
+          "title": "Reap stale workspace processes",
         },
         {
           "annotations": {
@@ -1732,6 +1656,7 @@ describe("tool catalog contracts", () => {
           },
           "description": "Use this when the user asks to place a mounted artifact or local file into an approved workspace scratch location.",
           "inputKeys": [
+            "agent_id",
             "dest_path",
             "overwrite",
             "reason",
@@ -1781,128 +1706,6 @@ describe("tool catalog contracts", () => {
         },
         {
           "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks to inspect repository structure without reading file contents. Supports pagination, filters, file sizes, and optional nested-repo expansion.",
-          "inputKeys": [
-            "cursor",
-            "exclude_globs",
-            "include_dependencies",
-            "include_files",
-            "include_generated",
-            "include_globs",
-            "include_nested_repos",
-            "max_depth",
-            "page_size",
-            "path",
-            "repo_id",
-            "respect_default_excludes",
-          ],
-          "name": "workspace_tree",
-          "outputKeys": [
-            "entries",
-            "excluded_summary",
-            "next_cursor",
-            "truncated",
-          ],
-          "title": "Inspect workspace tree",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks to read a specific UTF-8 text file with optional line ranges. Non-text files return guidance to use workspace_create_file_artifact.",
-          "inputKeys": [
-            "end_byte",
-            "end_line",
-            "max_bytes",
-            "override_default_excludes",
-            "path",
-            "repo_id",
-            "start_byte",
-            "start_line",
-          ],
-          "name": "workspace_read_file",
-          "outputKeys": [
-            "end_line",
-            "language",
-            "path",
-            "sha256",
-            "size_bytes",
-            "start_line",
-            "text",
-            "total_lines",
-            "truncated",
-            "warnings",
-          ],
-          "title": "Read workspace text file",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks to read a bounded explicit or glob-matched set of UTF-8 text files. Skips binary files and never reads whole repositories accidentally.",
-          "inputKeys": [
-            "cursor",
-            "exclude_globs",
-            "include_globs",
-            "max_bytes_per_file",
-            "max_files",
-            "max_total_bytes",
-            "paths",
-            "repo_id",
-          ],
-          "name": "workspace_read_many",
-          "outputKeys": [
-            "files",
-            "matched_count",
-            "next_cursor",
-            "returned_count",
-            "skipped",
-            "truncated",
-          ],
-          "title": "Read bounded workspace files",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks to search repository text files. Supports literal or regex queries, include/exclude globs, context lines, pagination, and secret-path blocking.",
-          "inputKeys": [
-            "context_lines",
-            "cursor",
-            "exclude_globs",
-            "include_globs",
-            "max_results",
-            "mode",
-            "query",
-            "repo_id",
-          ],
-          "name": "workspace_search",
-          "outputKeys": [
-            "matched_count",
-            "next_cursor",
-            "results",
-            "returned_count",
-            "truncated",
-            "warnings",
-          ],
-          "title": "Search workspace text",
-        },
-        {
-          "annotations": {
             "destructiveHint": true,
             "idempotentHint": false,
             "openWorldHint": false,
@@ -1911,6 +1714,7 @@ describe("tool catalog contracts", () => {
           "description": "Use this when the user asks to write or exactly edit one UTF-8 text file inside an approved workspace scratch location. Never stages or commits.",
           "inputKeys": [
             "action",
+            "agent_id",
             "content",
             "create_dirs",
             "dry_run",
@@ -1970,6 +1774,7 @@ describe("tool catalog contracts", () => {
           },
           "description": "Use this when the user asks to create directories inside approved workspace scratch locations, with dry-run support.",
           "inputKeys": [
+            "agent_id",
             "dry_run",
             "parents",
             "path",
@@ -1992,32 +1797,9 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": false,
           },
-          "description": "Use this when compatibility requires the older cleanup name. Prefer workspace_cleanup_paths for removing explicit approved scratch paths.",
-          "inputKeys": [
-            "dry_run",
-            "paths",
-            "reason",
-            "repo_id",
-          ],
-          "name": "workspace_delete_paths",
-          "outputKeys": [
-            "deleted",
-            "dry_run",
-            "ok",
-            "skipped",
-            "warnings",
-          ],
-          "title": "Compatibility workspace cleanup",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
           "description": "Use this when the user explicitly asks to remove approved scratch paths. Accepts explicit paths only, defaults to dry-run, and refuses tracked files.",
           "inputKeys": [
+            "agent_id",
             "dry_run",
             "paths",
             "reason",
@@ -2032,57 +1814,6 @@ describe("tool catalog contracts", () => {
             "warnings",
           ],
           "title": "Clean workspace scratch paths",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks for local git status without mutation, including branch, HEAD, and changed/untracked files.",
-          "inputKeys": [
-            "repo_id",
-          ],
-          "name": "workspace_git_status",
-          "outputKeys": [
-            "branch",
-            "clean",
-            "counts",
-            "files",
-            "head_sha",
-          ],
-          "title": "Read workspace git status",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks to read local git diff safely without mutation. Use path and byte limits when the diff is broad.",
-          "inputKeys": [
-            "base",
-            "compare",
-            "context_lines",
-            "max_bytes",
-            "paths",
-            "repo_id",
-            "staged",
-            "unstaged",
-          ],
-          "name": "workspace_git_diff",
-          "outputKeys": [
-            "base",
-            "compare",
-            "files",
-            "staged",
-            "truncated",
-            "unstaged",
-            "warnings",
-          ],
-          "title": "Read workspace git diff",
         },
         {
           "annotations": {

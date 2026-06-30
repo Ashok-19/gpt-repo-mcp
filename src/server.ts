@@ -8,6 +8,7 @@ import type { RuntimeContext } from "./runtime/context.js";
 import { buildMcpRoutePatterns, isAuthorizedMcpPath, sanitizeMcpRouteForAudit } from "./runtime/mcp-routes.js";
 import {
   createRequestId,
+  agentIdFromSessionId,
   requestAudit,
   withRequestTelemetry,
   type RequestTelemetryContext
@@ -38,12 +39,14 @@ function createMcpRequestContext(req: Request): RequestTelemetryContext {
     method === "tools/call" && typeof req.body?.params?.name === "string"
       ? req.body.params.name
       : undefined;
+  const sessionId = typeof req.headers["mcp-session-id"] === "string" ? req.headers["mcp-session-id"] : undefined;
 
   return {
     request_id: createRequestId(),
     http_method: req.method,
     route: sanitizeMcpRouteForAudit(req.path),
-    mcp_session: typeof req.headers["mcp-session-id"] === "string" ? "present" : "missing",
+    mcp_session: sessionId ? "present" : "missing",
+    ...(sessionId ? { agent_id: agentIdFromSessionId(sessionId) } : {}),
     mcp_method: method,
     mcp_tool: tool
   };
@@ -59,6 +62,7 @@ function attachMcpRequestAuditing(res: Response, context: RequestTelemetryContex
       status_code: res.statusCode,
       duration_ms: Date.now() - startedAt,
       mcp_session: context.mcp_session,
+      agent_id: context.agent_id,
       mcp_method: context.mcp_method,
       mcp_tool: context.mcp_tool
     });
@@ -85,6 +89,7 @@ app.post(mcpRoutePatterns, async (req: Request, res: Response) => {
       http_method: requestContext.http_method ?? "POST",
       route: requestContext.route ?? "/mcp",
       mcp_session: requestContext.mcp_session,
+      agent_id: requestContext.agent_id,
       mcp_method: requestContext.mcp_method,
       mcp_tool: requestContext.mcp_tool
     });
@@ -132,6 +137,7 @@ app.post(mcpRoutePatterns, async (req: Request, res: Response) => {
         route: requestContext.route ?? "/mcp",
         duration_ms: Date.now() - startedAt,
         mcp_session: requestContext.mcp_session,
+        agent_id: requestContext.agent_id,
         mcp_method: requestContext.mcp_method,
         mcp_tool: requestContext.mcp_tool
       });
@@ -158,6 +164,7 @@ app.get(mcpRoutePatterns, async (req: Request, res: Response) => {
       http_method: requestContext.http_method ?? "GET",
       route: requestContext.route ?? "/mcp",
       mcp_session: requestContext.mcp_session,
+      agent_id: requestContext.agent_id,
       mcp_method: requestContext.mcp_method,
       mcp_tool: requestContext.mcp_tool
     });
@@ -181,6 +188,7 @@ app.get(mcpRoutePatterns, async (req: Request, res: Response) => {
         route: requestContext.route ?? "/mcp",
         duration_ms: Date.now() - startedAt,
         mcp_session: requestContext.mcp_session,
+        agent_id: requestContext.agent_id,
         mcp_method: requestContext.mcp_method,
         mcp_tool: requestContext.mcp_tool
       });
@@ -203,6 +211,7 @@ app.delete(mcpRoutePatterns, async (req: Request, res: Response) => {
       http_method: requestContext.http_method ?? "DELETE",
       route: requestContext.route ?? "/mcp",
       mcp_session: requestContext.mcp_session,
+      agent_id: requestContext.agent_id,
       mcp_method: requestContext.mcp_method,
       mcp_tool: requestContext.mcp_tool
     });
@@ -226,6 +235,7 @@ app.delete(mcpRoutePatterns, async (req: Request, res: Response) => {
         route: requestContext.route ?? "/mcp",
         duration_ms: Date.now() - startedAt,
         mcp_session: requestContext.mcp_session,
+        agent_id: requestContext.agent_id,
         mcp_method: requestContext.mcp_method,
         mcp_tool: requestContext.mcp_tool
       });

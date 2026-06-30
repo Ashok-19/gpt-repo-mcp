@@ -18,7 +18,7 @@ export const descriptions = {
   repo_git_diff:
     "Use this when the user asks to review changes or inspect a git diff. Default first call should pass only repo_id. Do not include staged, unstaged, paths, max_bytes, or context_lines on the first pass. Use optional filters only after the default diff is truncated, too broad, or the user asks for a specific comparison.",
   repo_git_review:
-    "Use this when the user asks to review current git changes, recover bad write-tool edits, clean up generated artifacts, prepare staging, or plan a local commit without mutating anything. Workflow hub that returns status, diff summary, warnings, and ready-to-run composite payloads for repo_write_stage_commit and repo_write_recover plus low-level fallback payloads.",
+    "Use this when the user asks to review current git changes, recover bad write-tool edits, clean up generated artifacts, prepare staging, or plan a local commit without mutating anything. Workflow hub that returns status, diff summary, warnings, and ready-to-run composite payloads for repo_write_stage_commit and repo_write_recover.",
   repo_git_stage:
     "Use this when compatibility with the git-prefixed staging alias is needed; prefer repo_write_stage for ChatGPT workflows. Stages explicit repo-relative paths only, requires user approval and expected HEAD, and never runs shell commands.",
   repo_git_unstage:
@@ -65,6 +65,18 @@ export const descriptions = {
     "Use this when the user asks for a local-only ChatGPT handoff: skapa handoff, create handoff, skriv handoff, session handoff, resume note, fortsättningsanteckning, ny chatt context, or överlämning till nästa chatt. Creates .chatgpt/handoffs/*.local.md and updates current.local.md; never stages, commits, pushes, resets, checks out, or runs shell commands.",
   workspace_exec:
     "Use this when the user asks to run a local repository script or validation command. Runs an argv array inside an approved repository with policy checks and bounded output.",
+  workspace_agent_session:
+    "Use this when a ChatGPT tab or worker needs its own workspace identity and scratch directory. Returns an agent id and scratch/agents path without touching official files.",
+  workspace_claim_task:
+    "Use this when an agent starts focused work on one task. Creates a lightweight per-task claim so parallel agents do not promote the same task concurrently.",
+  workspace_release_task:
+    "Use this when an agent is done with a task claim. Releases only the matching agent claim or lock id.",
+  workspace_acquire_official_lock:
+    "Use this when an agent is ready for a serialized official-write or promotion step. Acquires one repository-wide lock scope without changing official files.",
+  workspace_release_official_lock:
+    "Use this when a serialized official-write or promotion step completes. Releases only the matching agent lock or lock id.",
+  workspace_reap_processes:
+    "Use this when stale repo-local Python or validation worker processes need inspection or cleanup. Defaults to dry-run and only considers processes whose cwd is inside the approved repo.",
   workspace_export_file:
     "Use this when compatibility requires the older file artifact name. Prefer workspace_create_file_artifact for creating a mounted reference to an approved repo-local file.",
   workspace_create_file_artifact:

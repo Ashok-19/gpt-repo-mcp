@@ -9,7 +9,18 @@ import { PathSandbox } from "../src/services/path-sandbox.js";
 import { RepoTreeService } from "../src/services/repo-tree-service.js";
 import { WorkspacePolicy } from "../src/services/workspace-policy.js";
 import { WorkspaceService } from "../src/services/workspace-service.js";
-import { workspaceCreateFileArtifactHandler, workspaceFileInfoHandler, workspacePolicyExplainHandler, workspaceWriteFileHandler } from "../src/tools/handlers.js";
+import {
+  workspaceAcquireOfficialLockHandler,
+  workspaceAgentSessionHandler,
+  workspaceClaimTaskHandler,
+  workspaceCreateFileArtifactHandler,
+  workspaceExecHandler,
+  workspaceFileInfoHandler,
+  workspacePolicyExplainHandler,
+  workspaceReleaseOfficialLockHandler,
+  workspaceReleaseTaskHandler,
+  workspaceWriteFileHandler
+} from "../src/tools/handlers.js";
 import type { RuntimeContext } from "../src/runtime/context.js";
 
 const execFileAsync = promisify(execFile);
@@ -83,14 +94,98 @@ describe("WorkspaceService", () => {
     expect(result.stdout).toContain("task349/task/task349.onnx");
   });
 
+  test("allows approved shell wrappers and timeout after recursive command checks", async () => {
+    const fixture = await createRepoFixture();
+    const service = await workspace(fixture.root);
+
+    const python312DryRun = await service.exec({
+      cwd: ".",
+      cmd: ["python3.12", "--version"],
+      dry_run: true,
+      reason: "Validate python3.12 command family"
+    });
+    expect(python312DryRun).toMatchObject({ dry_run: true });
+
+    const bash = await service.exec({
+      cwd: ".",
+      cmd: ["bash", "-lc", "python3 -c 'print(123)'"],
+      reason: "Run checked bash shell wrapper"
+    });
+    expect(bash.exit_code).toBe(0);
+    expect(bash.stdout).toContain("123");
+
+    const sh = await service.exec({
+      cwd: ".",
+      cmd: ["sh", "-lc", "cat docs/guide.md"],
+      reason: "Run checked sh shell wrapper"
+    });
+    expect(sh.exit_code).toBe(0);
+    expect(sh.stdout).toContain("Guide");
+
+    const wrapped = await service.exec({
+      cwd: ".",
+      cmd: ["timeout", "5", "python3", "--version"],
+      reason: "Run timeout wrapper"
+    });
+    expect(wrapped.exit_code).toBe(0);
+    expect(`${wrapped.stdout}${wrapped.stderr}`).toMatch(/Python/);
+  });
+
+  test("allows cp and mv into scratch while limiting rm to the matching agent scratch", async () => {
+    const fixture = await createRepoFixture();
+    const service = await workspace(fixture.root);
+    await mkdir(join(fixture.root, "scratch", "agents", "agent-a", "task001"), { recursive: true });
+
+    const copied = await service.exec({
+      agent_id: "agent-a",
+      cwd: ".",
+      cmd: ["cp", "docs/guide.md", "scratch/agents/agent-a/task001/readme-copy.md"],
+      reason: "Copy fixture into agent scratch"
+    });
+    expect(copied.exit_code).toBe(0);
+    await expect(readFile(join(fixture.root, "scratch", "agents", "agent-a", "task001", "readme-copy.md"), "utf8")).resolves.toContain("Guide");
+
+    const moved = await service.exec({
+      agent_id: "agent-a",
+      cwd: ".",
+      cmd: ["mv", "scratch/agents/agent-a/task001/readme-copy.md", "scratch/agents/agent-a/task001/readme-moved.md"],
+      reason: "Move fixture inside agent scratch"
+    });
+    expect(moved.exit_code).toBe(0);
+    await expect(readFile(join(fixture.root, "scratch", "agents", "agent-a", "task001", "readme-moved.md"), "utf8")).resolves.toContain("Guide");
+
+    const removed = await service.exec({
+      agent_id: "agent-a",
+      cwd: "scratch/agents/agent-a/task001",
+      cmd: ["rm", "readme-moved.md"],
+      reason: "Remove own agent scratch file"
+    });
+    expect(removed.exit_code).toBe(0);
+    await expect(readFile(join(fixture.root, "scratch", "agents", "agent-a", "task001", "readme-moved.md"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   test("blocks sudo and network command families", async () => {
     const fixture = await createRepoFixture();
     const service = await workspace(fixture.root);
 
     await expect(service.exec({ cwd: ".", cmd: ["sudo", "id"], reason: "Probe block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
     await expect(service.exec({ cwd: ".", cmd: ["curl", "https://example.com"], reason: "Probe block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
+    await expect(service.exec({ cwd: ".", cmd: ["timeout", "5", "curl", "https://example.com"], reason: "Probe timeout wrapper block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
     await expect(service.exec({ cwd: ".", cmd: ["git", "push"], reason: "Probe block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
     await expect(service.exec({ cwd: ".", cmd: ["python3", "../outside.py"], reason: "Probe path block" })).rejects.toMatchObject({ code: "PATH_TRAVERSAL_REJECTED" });
+    await expect(service.exec({ cwd: ".", cmd: ["bash", "-lc", "python3 --version && cat README.md"], reason: "Probe shell operator block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
+  });
+
+  test("blocks secret reads and rm outside matching agent scratch through exec", async () => {
+    const fixture = await createRepoFixture();
+    const service = await workspace(fixture.root);
+    await writeFile(join(fixture.root, ".env"), "TOKEN=secret\n");
+    await mkdir(join(fixture.root, "scratch"), { recursive: true });
+    await writeFile(join(fixture.root, "scratch", "delete-me.txt"), "temporary\n");
+
+    await expect(service.exec({ cwd: ".", cmd: ["cat", ".env"], reason: "Probe secret cat block" })).rejects.toMatchObject({ code: "SECRET_CANDIDATE_BLOCKED" });
+    await expect(service.exec({ cwd: ".", cmd: ["rm", "scratch/delete-me.txt"], reason: "Probe rm without agent block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
+    await expect(service.exec({ agent_id: "agent-a", cwd: ".", cmd: ["rm", "scratch/delete-me.txt"], reason: "Probe rm outside agent block" })).rejects.toMatchObject({ code: "WRITE_NOT_ALLOWED_GLOB" });
   });
 
   test("times out long-running commands and returns partial output metadata", async () => {
@@ -337,5 +432,117 @@ describe("WorkspaceService", () => {
       operation: "exec"
     }, runtime);
     expect(exec.structuredContent).toMatchObject({ allowed: true, suggested_tool: "workspace_exec" });
+  });
+
+  test("supports three simulated agents with isolated scratch and unchanged official files", async () => {
+    const fixture = await createRepoFixture();
+    const runtime = await context(fixture.root);
+    await mkdir(join(fixture.root, "task101"), { recursive: true });
+    await writeFile(join(fixture.root, "task101", "input.txt"), "official\n");
+    await writeFile(join(fixture.root, "task101", "validate_task.py"), "print('validation ok')\n");
+    const officialBefore = await readFile(join(fixture.root, "task101", "input.txt"), "utf8");
+
+    const agents = await Promise.all(["agent_a", "agent_b", "agent_c"].map(async (agentId, index) => {
+      const session = await workspaceAgentSessionHandler({
+        repo_id: "repo",
+        agent_id: agentId,
+        task_id: `task10${index}`,
+        reason: "Create isolated agent workspace"
+      }, runtime);
+      expect(session.isError).toBeUndefined();
+      const scratchPath = session.structuredContent!.task_scratch_path!;
+      const scriptPath = `${scratchPath}/run.py`;
+      const write = await workspaceWriteFileHandler({
+        repo_id: "repo",
+        agent_id: agentId,
+        path: scriptPath,
+        action: "write",
+        content: `print('${agentId}')\n`,
+        create_dirs: true,
+        reason: "Write isolated scratch script"
+      }, runtime);
+      expect(write.isError).toBeUndefined();
+      const run = await workspaceExecHandler({
+        repo_id: "repo",
+        agent_id: agentId,
+        cwd: ".",
+        cmd: ["python3", scriptPath],
+        reason: "Run isolated scratch script"
+      }, runtime);
+      expect(run.structuredContent).toMatchObject({ exit_code: 0, timed_out: false });
+      const validation = await workspaceExecHandler({
+        repo_id: "repo",
+        agent_id: agentId,
+        cwd: "task101",
+        cmd: ["python3", "validate_task.py"],
+        reason: "Run quick validation"
+      }, runtime);
+      expect(validation.structuredContent).toMatchObject({ exit_code: 0, timed_out: false });
+      return { agentId, scratchPath, scriptPath };
+    }));
+
+    expect(new Set(agents.map((agent) => agent.scratchPath)).size).toBe(3);
+    for (const agent of agents) {
+      expect(agent.scratchPath).toBe(`scratch/agents/${agent.agentId}/task10${agent.agentId.at(-1) === "a" ? "0" : agent.agentId.at(-1) === "b" ? "1" : "2"}`);
+      await expect(readFile(join(fixture.root, agent.scriptPath), "utf8")).resolves.toContain(agent.agentId);
+    }
+    await expect(readFile(join(fixture.root, "task101", "input.txt"), "utf8")).resolves.toBe(officialBefore);
+  });
+
+  test("serializes task claims and official-write locks", async () => {
+    const fixture = await createRepoFixture();
+    const runtime = await context(fixture.root);
+
+    const firstClaim = await workspaceClaimTaskHandler({
+      repo_id: "repo",
+      agent_id: "agent_one",
+      task_id: "task777",
+      reason: "Claim task"
+    }, runtime);
+    const secondClaim = await workspaceClaimTaskHandler({
+      repo_id: "repo",
+      agent_id: "agent_two",
+      task_id: "task777",
+      reason: "Claim task"
+    }, runtime);
+    expect(firstClaim.structuredContent).toMatchObject({ acquired: true, agent_id: "agent_one", resource: "task777" });
+    expect(secondClaim.structuredContent).toMatchObject({ acquired: false, agent_id: "agent_two", resource: "task777" });
+
+    const releaseClaim = await workspaceReleaseTaskHandler({
+      repo_id: "repo",
+      agent_id: "agent_one",
+      task_id: "task777",
+      claim_id: firstClaim.structuredContent!.lock_id,
+      reason: "Release task"
+    }, runtime);
+    expect(releaseClaim.structuredContent).toMatchObject({ released: true });
+
+    const firstLock = await workspaceAcquireOfficialLockHandler({
+      repo_id: "repo",
+      agent_id: "agent_one",
+      reason: "Acquire official write lock"
+    }, runtime);
+    const secondLock = await workspaceAcquireOfficialLockHandler({
+      repo_id: "repo",
+      agent_id: "agent_two",
+      reason: "Acquire official write lock"
+    }, runtime);
+    expect(firstLock.structuredContent).toMatchObject({ acquired: true, agent_id: "agent_one", resource: "official" });
+    expect(secondLock.structuredContent).toMatchObject({ acquired: false, agent_id: "agent_two", resource: "official" });
+
+    const releaseLock = await workspaceReleaseOfficialLockHandler({
+      repo_id: "repo",
+      agent_id: "agent_one",
+      lock_id: firstLock.structuredContent!.lock_id,
+      reason: "Release official write lock"
+    }, runtime);
+    expect(releaseLock.structuredContent).toMatchObject({ released: true });
+
+    const retryLock = await workspaceAcquireOfficialLockHandler({
+      repo_id: "repo",
+      agent_id: "agent_two",
+      reason: "Acquire official write lock after release"
+    }, runtime);
+    expect(retryLock.structuredContent).toMatchObject({ acquired: true, agent_id: "agent_two", resource: "official" });
   });
 });

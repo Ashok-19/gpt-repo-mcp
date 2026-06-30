@@ -4,8 +4,10 @@ import { WriteFileActionSchema } from "./write.contract.js";
 
 const ReasonSchema = z.string().min(1).optional();
 const StringRecordSchema = z.record(z.string(), z.string());
+const AgentIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/).optional();
 
 export const WorkspaceExecInputSchema = RepoInputSchema.extend({
+  agent_id: AgentIdSchema,
   cwd: z.string().default("."),
   cmd: z.array(z.string()).min(1),
   timeout_seconds: z.number().int().positive().optional(),
@@ -17,6 +19,7 @@ export const WorkspaceExecInputSchema = RepoInputSchema.extend({
 });
 
 export const WorkspaceExecResultSchema = z.object({
+  agent_id: z.string().optional(),
   exit_code: z.number().int().nullable(),
   stdout: z.string(),
   stderr: z.string(),
@@ -46,6 +49,7 @@ export const WorkspaceExportFileResultSchema = z.object({
 });
 
 export const WorkspaceImportFileInputSchema = RepoInputSchema.extend({
+  agent_id: AgentIdSchema,
   source_file: z.string().min(1),
   dest_path: z.string().min(1),
   overwrite: z.boolean().optional(),
@@ -105,6 +109,7 @@ export const WorkspaceReadManyInputSchema = RepoInputSchema.extend({
 });
 
 export const WorkspaceWriteFileInputSchema = RepoInputSchema.extend({
+  agent_id: AgentIdSchema,
   path: z.string().min(1),
   action: WriteFileActionSchema.optional(),
   content: z.string().optional(),
@@ -130,6 +135,7 @@ export const WorkspaceApplyPatchResultSchema = z.object({
 });
 
 export const WorkspaceMakeDirInputSchema = RepoInputSchema.extend({
+  agent_id: AgentIdSchema,
   path: z.string().min(1),
   parents: z.boolean().optional(),
   dry_run: z.boolean().optional(),
@@ -144,6 +150,7 @@ export const WorkspaceMakeDirResultSchema = z.object({
 });
 
 export const WorkspaceDeletePathsInputSchema = RepoInputSchema.extend({
+  agent_id: AgentIdSchema,
   paths: z.array(z.string()).min(1),
   dry_run: z.boolean().optional().default(true),
   reason: ReasonSchema
@@ -177,6 +184,98 @@ export const WorkspacePolicyExplainResultSchema = z.object({
   suggested_tool: z.string()
 });
 
+export const WorkspaceAgentSessionInputSchema = RepoInputSchema.extend({
+  agent_id: AgentIdSchema,
+  label: z.string().min(1).optional(),
+  task_id: z.string().min(1).optional(),
+  create_dirs: z.boolean().optional(),
+  reason: ReasonSchema
+});
+
+export const WorkspaceAgentSessionResultSchema = z.object({
+  ok: z.literal(true),
+  agent_id: z.string(),
+  scratch_root: z.string(),
+  task_scratch_path: z.string().optional(),
+  label: z.string().optional(),
+  instructions: z.array(z.string())
+});
+
+export const WorkspaceClaimTaskInputSchema = RepoInputSchema.extend({
+  task_id: z.string().min(1),
+  agent_id: AgentIdSchema,
+  ttl_seconds: z.number().int().positive().optional(),
+  reason: ReasonSchema
+});
+
+export const WorkspaceClaimTaskResultSchema = z.object({
+  ok: z.literal(true),
+  acquired: z.boolean(),
+  agent_id: z.string(),
+  resource: z.string(),
+  lock_id: z.string().optional(),
+  lock_path: z.string(),
+  expires_at: z.string().optional(),
+  owner: z.unknown().optional()
+});
+
+export const WorkspaceReleaseTaskInputSchema = RepoInputSchema.extend({
+  task_id: z.string().min(1),
+  agent_id: AgentIdSchema,
+  claim_id: z.string().optional(),
+  reason: ReasonSchema
+});
+
+export const WorkspaceReleaseTaskResultSchema = z.object({
+  ok: z.literal(true),
+  released: z.boolean(),
+  agent_id: z.string(),
+  resource: z.string(),
+  lock_path: z.string(),
+  owner: z.unknown().optional(),
+  warnings: z.array(z.string())
+});
+
+export const WorkspaceOfficialLockInputSchema = RepoInputSchema.extend({
+  agent_id: AgentIdSchema,
+  scope: z.string().min(1).optional(),
+  ttl_seconds: z.number().int().positive().optional(),
+  reason: ReasonSchema
+});
+
+export const WorkspaceOfficialLockResultSchema = WorkspaceClaimTaskResultSchema;
+
+export const WorkspaceOfficialUnlockInputSchema = RepoInputSchema.extend({
+  agent_id: AgentIdSchema,
+  scope: z.string().min(1).optional(),
+  lock_id: z.string().optional(),
+  reason: ReasonSchema
+});
+
+export const WorkspaceOfficialUnlockResultSchema = WorkspaceReleaseTaskResultSchema;
+
+export const WorkspaceReapProcessesInputSchema = RepoInputSchema.extend({
+  dry_run: z.boolean().optional(),
+  min_age_seconds: z.number().int().nonnegative().optional(),
+  reason: ReasonSchema
+});
+
+export const WorkspaceReapProcessesResultSchema = z.object({
+  ok: z.literal(true),
+  dry_run: z.boolean(),
+  candidates: z.array(z.object({
+    pid: z.number().int().positive(),
+    age_seconds: z.number().int().nonnegative(),
+    command: z.string(),
+    cwd: z.string().optional()
+  })),
+  killed: z.array(z.object({
+    pid: z.number().int().positive(),
+    command: z.string()
+  })),
+  warnings: z.array(z.string())
+});
+
 export type WorkspaceExecInput = z.infer<typeof WorkspaceExecInputSchema>;
 export type WorkspaceExportFileInput = z.infer<typeof WorkspaceExportFileInputSchema>;
 export type WorkspaceImportFileInput = z.infer<typeof WorkspaceImportFileInputSchema>;
@@ -186,3 +285,9 @@ export type WorkspaceApplyPatchInput = z.infer<typeof WorkspaceApplyPatchInputSc
 export type WorkspaceMakeDirInput = z.infer<typeof WorkspaceMakeDirInputSchema>;
 export type WorkspaceDeletePathsInput = z.infer<typeof WorkspaceDeletePathsInputSchema>;
 export type WorkspacePolicyExplainInput = z.infer<typeof WorkspacePolicyExplainInputSchema>;
+export type WorkspaceAgentSessionInput = z.infer<typeof WorkspaceAgentSessionInputSchema>;
+export type WorkspaceClaimTaskInput = z.infer<typeof WorkspaceClaimTaskInputSchema>;
+export type WorkspaceReleaseTaskInput = z.infer<typeof WorkspaceReleaseTaskInputSchema>;
+export type WorkspaceOfficialLockInput = z.infer<typeof WorkspaceOfficialLockInputSchema>;
+export type WorkspaceOfficialUnlockInput = z.infer<typeof WorkspaceOfficialUnlockInputSchema>;
+export type WorkspaceReapProcessesInput = z.infer<typeof WorkspaceReapProcessesInputSchema>;

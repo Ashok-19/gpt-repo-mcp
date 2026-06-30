@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { redactSensitiveText } from "./result-envelope.js";
 
@@ -7,6 +7,7 @@ export type RequestTelemetryContext = {
   http_method?: string;
   route?: string;
   mcp_session?: "present" | "missing";
+  agent_id?: string;
   mcp_method?: string;
   mcp_tool?: string;
 };
@@ -23,6 +24,7 @@ export type AuditEvent = {
   command_family?: string;
   rejection_reason?: string;
   error_code?: string;
+  agent_id?: string;
   request_id?: string;
   mcp_method?: string;
   mcp_tool?: string;
@@ -36,6 +38,7 @@ export type RequestAuditEvent = {
   status_code?: number;
   duration_ms?: number;
   mcp_session?: "present" | "missing";
+  agent_id?: string;
   mcp_method?: string;
   mcp_tool?: string;
 };
@@ -134,6 +137,7 @@ export function formatRequestAuditLine(event: RequestAuditEvent): string {
       event.mcp_method,
       event.mcp_tool,
       event.mcp_session ? `session=${event.mcp_session}` : undefined,
+      event.agent_id ? `agent=${event.agent_id}` : undefined,
       `req=${shortRequestId(event.request_id)}`
     ]);
   }
@@ -158,6 +162,7 @@ export function createAuditEvent(event: AuditEvent): AuditEvent {
     ...event,
     mcp_method: sanitizeAuditLabel(event.mcp_method ?? context?.mcp_method),
     mcp_tool: sanitizeAuditLabel(event.mcp_tool ?? context?.mcp_tool),
+    agent_id: sanitizeAuditLabel(event.agent_id ?? context?.agent_id),
     paths: event.paths?.map((path) => redactSensitiveText(path)),
     globs: event.globs?.map((glob) => redactSensitiveText(glob)),
     warnings: event.warnings?.map((warning) => redactSensitiveText(warning)),
@@ -187,9 +192,14 @@ export function createRequestAuditEvent(event: RequestAuditEvent): RequestAuditE
     status_code: event.status_code,
     duration_ms: event.duration_ms,
     mcp_session: event.mcp_session,
+    agent_id: sanitizeAuditLabel(event.agent_id),
     mcp_method: sanitizeAuditLabel(event.mcp_method),
     mcp_tool: sanitizeAuditLabel(event.mcp_tool)
   };
+}
+
+export function agentIdFromSessionId(sessionId: string): string {
+  return `agent_${createHash("sha256").update(sessionId).digest("hex").slice(0, 12)}`;
 }
 
 export function requestAudit(event: RequestAuditEvent): void {

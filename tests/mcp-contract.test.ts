@@ -23,8 +23,8 @@ describe("MCP contract", () => {
       expect(client.getInstructions()).toBe(SERVER_INSTRUCTIONS);
       expect(SERVER_INSTRUCTIONS).not.toContain("read-only repository app");
       expect(SERVER_INSTRUCTIONS).toContain("Mutating tools are disabled by default and require repo-local config opt-in");
-      expect(SERVER_INSTRUCTIONS).toContain("Prefer the repo_write_* names for ChatGPT workflows");
-      expect(SERVER_INSTRUCTIONS).toContain("repo_write_commit, repo_write_stage_commit, and repo_git_commit create local commits only");
+      expect(SERVER_INSTRUCTIONS).toContain("Public mutating tools are repo_write_file");
+      expect(SERVER_INSTRUCTIONS).toContain("repo_write_stage_commit creates local commits only");
       expect(SERVER_INSTRUCTIONS).toContain("repo_git_review is the workflow hub");
       expect(SERVER_INSTRUCTIONS).toContain("prefer composite workflow tools");
       expect(SERVER_INSTRUCTIONS).toContain("repo_write_stage_commit for reviewed happy-path local commits");
@@ -33,8 +33,8 @@ describe("MCP contract", () => {
       expect(SERVER_INSTRUCTIONS).toContain("Omit optional reason by default");
       expect(SERVER_INSTRUCTIONS).toContain("repo_last_write");
       expect(SERVER_INSTRUCTIONS).not.toContain("dry-run first when possible");
-      expect(SERVER_INSTRUCTIONS).toContain("do not push");
-      expect(SERVER_INSTRUCTIONS).toContain("do not run shell commands");
+      expect(SERVER_INSTRUCTIONS).toContain("does not push");
+      expect(SERVER_INSTRUCTIONS).toContain("or run shell commands");
     } finally {
       await close();
     }
@@ -70,6 +70,8 @@ describe("MCP contract", () => {
 
       expect(names.has("workspace_create_file_artifact")).toBe(true);
       expect(names.has("workspace_cleanup_paths")).toBe(true);
+      expect(names.has("workspace_export_file")).toBe(false);
+      expect(names.has("workspace_delete_paths")).toBe(false);
     } finally {
       await close();
     }
@@ -332,7 +334,7 @@ describe("MCP contract", () => {
               "openWorldHint": false,
               "readOnlyHint": true,
             },
-            "description": "Use this when the user asks to review current git changes, recover bad write-tool edits, clean up generated artifacts, prepare staging, or plan a local commit without mutating anything. Workflow hub that returns status, diff summary, warnings, and ready-to-run composite payloads for repo_write_stage_commit and repo_write_recover plus low-level fallback payloads.",
+            "description": "Use this when the user asks to review current git changes, recover bad write-tool edits, clean up generated artifacts, prepare staging, or plan a local commit without mutating anything. Workflow hub that returns status, diff summary, warnings, and ready-to-run composite payloads for repo_write_stage_commit and repo_write_recover.",
             "inputKeys": [
               "max_files",
               "mode",
@@ -350,192 +352,6 @@ describe("MCP contract", () => {
               "recommendation",
             ],
             "title": "Plan git review",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": false,
-              "readOnlyHint": false,
-            },
-            "description": "Use this when compatibility with the git-prefixed staging alias is needed; prefer repo_write_stage for ChatGPT workflows. Stages explicit repo-relative paths only, requires user approval and expected HEAD, and never runs shell commands.",
-            "inputKeys": [
-              "dry_run",
-              "expected_head_sha",
-              "paths",
-              "reason",
-              "repo_id",
-            ],
-            "name": "repo_git_stage",
-            "outputKeys": [
-              "dry_run",
-              "head_sha",
-              "ok",
-              "skipped",
-              "staged_paths",
-              "warnings",
-            ],
-            "title": "Stage explicit git paths",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": false,
-              "readOnlyHint": false,
-            },
-            "description": "Use this when compatibility with the git-prefixed unstaging alias is needed; prefer repo_write_unstage for ChatGPT workflows. Unstages explicit repo-relative paths only, requires user approval and expected HEAD, and never runs shell commands.",
-            "inputKeys": [
-              "dry_run",
-              "expected_head_sha",
-              "paths",
-              "reason",
-              "repo_id",
-            ],
-            "name": "repo_git_unstage",
-            "outputKeys": [
-              "dry_run",
-              "head_sha",
-              "ok",
-              "skipped",
-              "unstaged_paths",
-              "warnings",
-            ],
-            "title": "Unstage explicit git paths",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": false,
-              "readOnlyHint": false,
-            },
-            "description": "Use this when the user explicitly asks to recover bad unstaged worktree changes for reviewed explicit repo-relative paths. Runs only git restore -- <paths>, requires expected HEAD, does not unstage, stage, commit, reset, checkout, or run shell commands.",
-            "inputKeys": [
-              "dry_run",
-              "expected_head_sha",
-              "paths",
-              "reason",
-              "repo_id",
-            ],
-            "name": "repo_git_restore_paths",
-            "outputKeys": [
-              "dry_run",
-              "head_sha",
-              "ok",
-              "restored_paths",
-              "skipped",
-              "warnings",
-            ],
-            "title": "Restore explicit worktree paths",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": false,
-              "readOnlyHint": false,
-            },
-            "description": "Use this when compatibility with the git-prefixed commit alias is needed; prefer repo_write_commit for ChatGPT workflows. Creates a local-only commit from exact staged paths, requires user approval and expected HEAD, does not push, and never runs shell commands.",
-            "inputKeys": [
-              "dry_run",
-              "expected_head_sha",
-              "expected_staged_paths",
-              "message",
-              "reason",
-              "repo_id",
-            ],
-            "name": "repo_git_commit",
-            "outputKeys": [
-              "commit_sha",
-              "committed_paths",
-              "dry_run",
-              "head_after",
-              "head_before",
-              "ok",
-              "warnings",
-            ],
-            "title": "Create local git commit",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": false,
-              "readOnlyHint": false,
-            },
-            "description": "Use this when the user explicitly asks to stage reviewed repo-relative paths separately or granular control is needed; prefer repo_write_stage_commit after repo_git_review for normal reviewed commits. Requires user approval, expected HEAD, explicit paths, and never runs shell commands.",
-            "inputKeys": [
-              "dry_run",
-              "expected_head_sha",
-              "paths",
-              "reason",
-              "repo_id",
-            ],
-            "name": "repo_write_stage",
-            "outputKeys": [
-              "dry_run",
-              "head_sha",
-              "ok",
-              "skipped",
-              "staged_paths",
-              "warnings",
-            ],
-            "title": "Stage reviewed paths",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": false,
-              "readOnlyHint": false,
-            },
-            "description": "Use this when the user explicitly asks to unstage reviewed repo-relative paths separately or granular recovery control is needed; prefer repo_write_recover after repo_git_review for normal reviewed recovery. Requires user approval, expected HEAD, explicit paths, and never runs shell commands.",
-            "inputKeys": [
-              "dry_run",
-              "expected_head_sha",
-              "paths",
-              "reason",
-              "repo_id",
-            ],
-            "name": "repo_write_unstage",
-            "outputKeys": [
-              "dry_run",
-              "head_sha",
-              "ok",
-              "skipped",
-              "unstaged_paths",
-              "warnings",
-            ],
-            "title": "Unstage reviewed paths",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": false,
-              "readOnlyHint": false,
-            },
-            "description": "Use this when the user explicitly asks to create a local-only commit from already staged reviewed paths, or staged-only flow requires a commit without staging; prefer repo_write_stage_commit after repo_git_review for normal reviewed commits. Requires user approval, exact staged path verification, expected HEAD, does not push, and never runs shell commands.",
-            "inputKeys": [
-              "dry_run",
-              "expected_head_sha",
-              "expected_staged_paths",
-              "message",
-              "reason",
-              "repo_id",
-            ],
-            "name": "repo_write_commit",
-            "outputKeys": [
-              "commit_sha",
-              "committed_paths",
-              "dry_run",
-              "head_after",
-              "head_before",
-              "ok",
-              "warnings",
-            ],
-            "title": "Create reviewed local commit",
           },
           {
             "annotations": {
@@ -599,30 +415,6 @@ describe("MCP contract", () => {
               "warnings",
             ],
             "title": "Recover reviewed paths",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": false,
-              "readOnlyHint": false,
-            },
-            "description": "Use this when the user explicitly asks to delete generated repo-local artifacts or local ChatGPT artifacts separately, or granular cleanup control is needed; prefer repo_write_recover after repo_git_review for normal reviewed recovery. Requires user approval, explicit paths, refuses tracked files, and never runs shell commands or git clean.",
-            "inputKeys": [
-              "dry_run",
-              "paths",
-              "reason",
-              "repo_id",
-            ],
-            "name": "repo_cleanup_paths",
-            "outputKeys": [
-              "deleted",
-              "dry_run",
-              "ok",
-              "skipped",
-              "warnings",
-            ],
-            "title": "Clean up generated paths",
           },
           {
             "annotations": {
@@ -994,6 +786,7 @@ describe("MCP contract", () => {
             },
             "description": "Use this when the user asks to run a local repository script or validation command. Runs an argv array inside an approved repository with policy checks and bounded output.",
             "inputKeys": [
+              "agent_id",
               "cmd",
               "cwd",
               "dry_run",
@@ -1006,6 +799,7 @@ describe("MCP contract", () => {
             ],
             "name": "workspace_exec",
             "outputKeys": [
+              "agent_id",
               "cmd",
               "cwd",
               "dry_run",
@@ -1021,29 +815,164 @@ describe("MCP contract", () => {
           },
           {
             "annotations": {
-              "destructiveHint": false,
-              "idempotentHint": true,
+              "destructiveHint": true,
+              "idempotentHint": false,
               "openWorldHint": false,
-              "readOnlyHint": true,
+              "readOnlyHint": false,
             },
-            "description": "Use this when compatibility requires the older file artifact name. Prefer workspace_create_file_artifact for creating a mounted reference to an approved repo-local file.",
+            "description": "Use this when a ChatGPT tab or worker needs its own workspace identity and scratch directory. Returns an agent id and scratch/agents path without touching official files.",
             "inputKeys": [
-              "max_bytes",
-              "path",
+              "agent_id",
+              "create_dirs",
+              "label",
+              "reason",
+              "repo_id",
+              "task_id",
+            ],
+            "name": "workspace_agent_session",
+            "outputKeys": [
+              "agent_id",
+              "instructions",
+              "label",
+              "ok",
+              "scratch_root",
+              "task_scratch_path",
+            ],
+            "title": "Create workspace agent session",
+          },
+          {
+            "annotations": {
+              "destructiveHint": true,
+              "idempotentHint": false,
+              "openWorldHint": false,
+              "readOnlyHint": false,
+            },
+            "description": "Use this when an agent starts focused work on one task. Creates a lightweight per-task claim so parallel agents do not promote the same task concurrently.",
+            "inputKeys": [
+              "agent_id",
+              "reason",
+              "repo_id",
+              "task_id",
+              "ttl_seconds",
+            ],
+            "name": "workspace_claim_task",
+            "outputKeys": [
+              "acquired",
+              "agent_id",
+              "expires_at",
+              "lock_id",
+              "lock_path",
+              "ok",
+              "owner",
+              "resource",
+            ],
+            "title": "Claim workspace task",
+          },
+          {
+            "annotations": {
+              "destructiveHint": true,
+              "idempotentHint": false,
+              "openWorldHint": false,
+              "readOnlyHint": false,
+            },
+            "description": "Use this when an agent is done with a task claim. Releases only the matching agent claim or lock id.",
+            "inputKeys": [
+              "agent_id",
+              "claim_id",
+              "reason",
+              "repo_id",
+              "task_id",
+            ],
+            "name": "workspace_release_task",
+            "outputKeys": [
+              "agent_id",
+              "lock_path",
+              "ok",
+              "owner",
+              "released",
+              "resource",
+              "warnings",
+            ],
+            "title": "Release workspace task claim",
+          },
+          {
+            "annotations": {
+              "destructiveHint": true,
+              "idempotentHint": false,
+              "openWorldHint": false,
+              "readOnlyHint": false,
+            },
+            "description": "Use this when an agent is ready for a serialized official-write or promotion step. Acquires one repository-wide lock scope without changing official files.",
+            "inputKeys": [
+              "agent_id",
+              "reason",
+              "repo_id",
+              "scope",
+              "ttl_seconds",
+            ],
+            "name": "workspace_acquire_official_lock",
+            "outputKeys": [
+              "acquired",
+              "agent_id",
+              "expires_at",
+              "lock_id",
+              "lock_path",
+              "ok",
+              "owner",
+              "resource",
+            ],
+            "title": "Acquire official workspace lock",
+          },
+          {
+            "annotations": {
+              "destructiveHint": true,
+              "idempotentHint": false,
+              "openWorldHint": false,
+              "readOnlyHint": false,
+            },
+            "description": "Use this when a serialized official-write or promotion step completes. Releases only the matching agent lock or lock id.",
+            "inputKeys": [
+              "agent_id",
+              "lock_id",
+              "reason",
+              "repo_id",
+              "scope",
+            ],
+            "name": "workspace_release_official_lock",
+            "outputKeys": [
+              "agent_id",
+              "lock_path",
+              "ok",
+              "owner",
+              "released",
+              "resource",
+              "warnings",
+            ],
+            "title": "Release official workspace lock",
+          },
+          {
+            "annotations": {
+              "destructiveHint": true,
+              "idempotentHint": false,
+              "openWorldHint": false,
+              "readOnlyHint": false,
+            },
+            "description": "Use this when stale repo-local Python or validation worker processes need inspection or cleanup. Defaults to dry-run and only considers processes whose cwd is inside the approved repo.",
+            "inputKeys": [
+              "dry_run",
+              "min_age_seconds",
               "reason",
               "repo_id",
             ],
-            "name": "workspace_export_file",
+            "name": "workspace_reap_processes",
             "outputKeys": [
-              "mime",
-              "mounted_path",
-              "path",
-              "resource_uri",
-              "sha256",
-              "size_bytes",
+              "candidates",
+              "dry_run",
+              "killed",
+              "ok",
               "warnings",
             ],
-            "title": "Create compatibility file artifact",
+            "title": "Reap stale workspace processes",
           },
           {
             "annotations": {
@@ -1080,6 +1009,7 @@ describe("MCP contract", () => {
             },
             "description": "Use this when the user asks to place a mounted artifact or local file into an approved workspace scratch location.",
             "inputKeys": [
+              "agent_id",
               "dest_path",
               "overwrite",
               "reason",
@@ -1129,128 +1059,6 @@ describe("MCP contract", () => {
           },
           {
             "annotations": {
-              "destructiveHint": false,
-              "idempotentHint": true,
-              "openWorldHint": false,
-              "readOnlyHint": true,
-            },
-            "description": "Use this when the user asks to inspect repository structure without reading file contents. Supports pagination, filters, file sizes, and optional nested-repo expansion.",
-            "inputKeys": [
-              "cursor",
-              "exclude_globs",
-              "include_dependencies",
-              "include_files",
-              "include_generated",
-              "include_globs",
-              "include_nested_repos",
-              "max_depth",
-              "page_size",
-              "path",
-              "repo_id",
-              "respect_default_excludes",
-            ],
-            "name": "workspace_tree",
-            "outputKeys": [
-              "entries",
-              "excluded_summary",
-              "next_cursor",
-              "truncated",
-            ],
-            "title": "Inspect workspace tree",
-          },
-          {
-            "annotations": {
-              "destructiveHint": false,
-              "idempotentHint": true,
-              "openWorldHint": false,
-              "readOnlyHint": true,
-            },
-            "description": "Use this when the user asks to read a specific UTF-8 text file with optional line ranges. Non-text files return guidance to use workspace_create_file_artifact.",
-            "inputKeys": [
-              "end_byte",
-              "end_line",
-              "max_bytes",
-              "override_default_excludes",
-              "path",
-              "repo_id",
-              "start_byte",
-              "start_line",
-            ],
-            "name": "workspace_read_file",
-            "outputKeys": [
-              "end_line",
-              "language",
-              "path",
-              "sha256",
-              "size_bytes",
-              "start_line",
-              "text",
-              "total_lines",
-              "truncated",
-              "warnings",
-            ],
-            "title": "Read workspace text file",
-          },
-          {
-            "annotations": {
-              "destructiveHint": false,
-              "idempotentHint": true,
-              "openWorldHint": false,
-              "readOnlyHint": true,
-            },
-            "description": "Use this when the user asks to read a bounded explicit or glob-matched set of UTF-8 text files. Skips binary files and never reads whole repositories accidentally.",
-            "inputKeys": [
-              "cursor",
-              "exclude_globs",
-              "include_globs",
-              "max_bytes_per_file",
-              "max_files",
-              "max_total_bytes",
-              "paths",
-              "repo_id",
-            ],
-            "name": "workspace_read_many",
-            "outputKeys": [
-              "files",
-              "matched_count",
-              "next_cursor",
-              "returned_count",
-              "skipped",
-              "truncated",
-            ],
-            "title": "Read bounded workspace files",
-          },
-          {
-            "annotations": {
-              "destructiveHint": false,
-              "idempotentHint": true,
-              "openWorldHint": false,
-              "readOnlyHint": true,
-            },
-            "description": "Use this when the user asks to search repository text files. Supports literal or regex queries, include/exclude globs, context lines, pagination, and secret-path blocking.",
-            "inputKeys": [
-              "context_lines",
-              "cursor",
-              "exclude_globs",
-              "include_globs",
-              "max_results",
-              "mode",
-              "query",
-              "repo_id",
-            ],
-            "name": "workspace_search",
-            "outputKeys": [
-              "matched_count",
-              "next_cursor",
-              "results",
-              "returned_count",
-              "truncated",
-              "warnings",
-            ],
-            "title": "Search workspace text",
-          },
-          {
-            "annotations": {
               "destructiveHint": true,
               "idempotentHint": false,
               "openWorldHint": false,
@@ -1259,6 +1067,7 @@ describe("MCP contract", () => {
             "description": "Use this when the user asks to write or exactly edit one UTF-8 text file inside an approved workspace scratch location. Never stages or commits.",
             "inputKeys": [
               "action",
+              "agent_id",
               "content",
               "create_dirs",
               "dry_run",
@@ -1318,6 +1127,7 @@ describe("MCP contract", () => {
             },
             "description": "Use this when the user asks to create directories inside approved workspace scratch locations, with dry-run support.",
             "inputKeys": [
+              "agent_id",
               "dry_run",
               "parents",
               "path",
@@ -1340,32 +1150,9 @@ describe("MCP contract", () => {
               "openWorldHint": false,
               "readOnlyHint": false,
             },
-            "description": "Use this when compatibility requires the older cleanup name. Prefer workspace_cleanup_paths for removing explicit approved scratch paths.",
-            "inputKeys": [
-              "dry_run",
-              "paths",
-              "reason",
-              "repo_id",
-            ],
-            "name": "workspace_delete_paths",
-            "outputKeys": [
-              "deleted",
-              "dry_run",
-              "ok",
-              "skipped",
-              "warnings",
-            ],
-            "title": "Compatibility workspace cleanup",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": false,
-              "readOnlyHint": false,
-            },
             "description": "Use this when the user explicitly asks to remove approved scratch paths. Accepts explicit paths only, defaults to dry-run, and refuses tracked files.",
             "inputKeys": [
+              "agent_id",
               "dry_run",
               "paths",
               "reason",
@@ -1380,57 +1167,6 @@ describe("MCP contract", () => {
               "warnings",
             ],
             "title": "Clean workspace scratch paths",
-          },
-          {
-            "annotations": {
-              "destructiveHint": false,
-              "idempotentHint": true,
-              "openWorldHint": false,
-              "readOnlyHint": true,
-            },
-            "description": "Use this when the user asks for local git status without mutation, including branch, HEAD, and changed/untracked files.",
-            "inputKeys": [
-              "repo_id",
-            ],
-            "name": "workspace_git_status",
-            "outputKeys": [
-              "branch",
-              "clean",
-              "counts",
-              "files",
-              "head_sha",
-            ],
-            "title": "Read workspace git status",
-          },
-          {
-            "annotations": {
-              "destructiveHint": false,
-              "idempotentHint": true,
-              "openWorldHint": false,
-              "readOnlyHint": true,
-            },
-            "description": "Use this when the user asks to read local git diff safely without mutation. Use path and byte limits when the diff is broad.",
-            "inputKeys": [
-              "base",
-              "compare",
-              "context_lines",
-              "max_bytes",
-              "paths",
-              "repo_id",
-              "staged",
-              "unstaged",
-            ],
-            "name": "workspace_git_diff",
-            "outputKeys": [
-              "base",
-              "compare",
-              "files",
-              "staged",
-              "truncated",
-              "unstaged",
-              "warnings",
-            ],
-            "title": "Read workspace git diff",
           },
           {
             "annotations": {
@@ -1705,10 +1441,13 @@ describe("MCP contract", () => {
     }
   });
 
-  test("representative calls for every tool match their output schema", async () => {
-    const { client, close, head } = await connectFixtureServer();
+  test("representative calls for every exposed tool match their output schema", async () => {
+    const { client, close, head, root } = await connectFixtureServer();
     try {
-      for (const [name, args] of Object.entries(representativeCalls(head))) {
+      const calls = representativeCalls(head, root);
+      expect(Object.keys(calls).sort()).toEqual(toolCatalog.map((tool) => tool.name).sort());
+
+      for (const [name, args] of Object.entries(calls)) {
         const result = await client.callTool({ name, arguments: args });
         expect(result.isError, name).toBeUndefined();
         expect(result.structuredContent, name).toBeDefined();
@@ -1727,9 +1466,10 @@ describe("MCP contract", () => {
   });
 });
 
-function representativeCalls(head: string): Record<string, Record<string, unknown>> {
+function representativeCalls(head: string, root: string): Record<string, Record<string, unknown>> {
   return {
   repo_list_roots: {},
+  repo_policy_explain: { repo_id: "fixture", path: "README.md", operation: "read" },
   repo_last_write: { repo_id: "fixture" },
   repo_tree: { repo_id: "fixture", path: ".", max_depth: 2, page_size: 10 },
   repo_search: { repo_id: "fixture", query: "Fixture", max_results: 5 },
@@ -1738,16 +1478,8 @@ function representativeCalls(head: string): Record<string, Record<string, unknow
   repo_git_status: { repo_id: "fixture" },
   repo_git_diff: { repo_id: "fixture" },
   repo_git_review: { repo_id: "fixture" },
-  repo_git_stage: { repo_id: "fixture", paths: ["docs/write-dry-run.md"], expected_head_sha: head, dry_run: true },
-  repo_git_unstage: { repo_id: "fixture", paths: ["docs/staged.md"], expected_head_sha: head, dry_run: true },
-  repo_git_restore_paths: { repo_id: "fixture", paths: ["docs/write-dry-run.md"], expected_head_sha: head, dry_run: true },
-  repo_git_commit: { repo_id: "fixture", message: "Update staged docs", expected_head_sha: head, expected_staged_paths: ["docs/staged.md"], dry_run: true },
-  repo_write_stage: { repo_id: "fixture", paths: ["docs/write-dry-run.md"], expected_head_sha: head, dry_run: true },
-  repo_write_unstage: { repo_id: "fixture", paths: ["docs/staged.md"], expected_head_sha: head, dry_run: true },
-  repo_write_commit: { repo_id: "fixture", message: "Update staged docs", expected_head_sha: head, expected_staged_paths: ["docs/staged.md"], dry_run: true },
   repo_write_stage_commit: { repo_id: "fixture", paths: ["docs/staged.md"], message: "Update staged docs", expected_head_sha: head, dry_run: true },
   repo_write_recover: { repo_id: "fixture", restore_paths: ["docs/write-dry-run.md"], cleanup_paths: [".chatgpt/tool-tests/cleanup.txt"], expected_head_sha: head, dry_run: true },
-  repo_cleanup_paths: { repo_id: "fixture", paths: [".chatgpt/tool-tests/cleanup.txt"], dry_run: true },
   repo_project_brief: { repo_id: "fixture" },
   repo_task_inventory: { repo_id: "fixture", max_results: 5 },
   repo_decision_memory: { repo_id: "fixture" },
@@ -1797,7 +1529,27 @@ function representativeCalls(head: string): Record<string, Record<string, unknow
     why: "Output schema should validate for the handoff tool.",
     next_steps: [{ title: "Review handoff output" }],
     dry_run: true
-  }
+  },
+  workspace_exec: { repo_id: "fixture", cwd: ".", cmd: ["python3", "--version"], timeout_seconds: 30, reason: "Smoke test" },
+  workspace_agent_session: { repo_id: "fixture", agent_id: "smoke-agent", task_id: "task001", create_dirs: true, reason: "Smoke session" },
+  workspace_claim_task: { repo_id: "fixture", agent_id: "smoke-agent", task_id: "task001", reason: "Smoke claim" },
+  workspace_release_task: { repo_id: "fixture", agent_id: "smoke-agent", task_id: "task001", reason: "Smoke release" },
+  workspace_acquire_official_lock: { repo_id: "fixture", agent_id: "smoke-agent", scope: "smoke", reason: "Smoke lock" },
+  workspace_release_official_lock: { repo_id: "fixture", agent_id: "smoke-agent", scope: "smoke", reason: "Smoke unlock" },
+  workspace_reap_processes: { repo_id: "fixture", dry_run: true, min_age_seconds: 0, reason: "Smoke reap" },
+  workspace_create_file_artifact: { repo_id: "fixture", path: "README.md", max_bytes: 10000, reason: "Smoke artifact" },
+  workspace_import_file: { repo_id: "fixture", source_file: join(root, "README.md"), dest_path: "scratch/tool-tests/imported-readme.md", overwrite: true, reason: "Smoke import" },
+  workspace_file_info: { repo_id: "fixture", path: "README.md", include_hash: true, include_mime: true },
+  workspace_write_file: { repo_id: "fixture", path: "scratch/tool-tests/write-file.txt", action: "write", content: "planned\n", create_dirs: true, dry_run: true, reason: "Smoke workspace write" },
+  workspace_apply_patch: {
+    repo_id: "fixture",
+    patch: "diff --git a/scratch/tool-tests/patch.txt b/scratch/tool-tests/patch.txt\nnew file mode 100644\nindex 0000000..257cc56\n--- /dev/null\n+++ b/scratch/tool-tests/patch.txt\n@@ -0,0 +1 @@\n+planned\n",
+    dry_run: true,
+    reason: "Smoke workspace patch"
+  },
+  workspace_make_dir: { repo_id: "fixture", path: "scratch/tool-tests/new-dir", parents: true, dry_run: true, reason: "Smoke workspace mkdir" },
+  workspace_cleanup_paths: { repo_id: "fixture", paths: ["scratch/tool-tests/imported-readme.md"], dry_run: true, reason: "Smoke workspace cleanup" },
+  workspace_policy_explain: { repo_id: "fixture", path: "scratch/tool-tests/imported-readme.md", operation: "delete" }
   };
 }
 
@@ -1831,6 +1583,7 @@ async function connectFixtureServer() {
   return {
     client,
     head,
+    root,
     close: async () => {
       await client.close();
       await server.close();

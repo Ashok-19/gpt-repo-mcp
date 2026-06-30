@@ -21,6 +21,10 @@ import { WriteChangesInputSchema, WriteChangesResultSchema, WriteFileInputSchema
 import {
   WorkspaceApplyPatchInputSchema,
   WorkspaceApplyPatchResultSchema,
+  WorkspaceAgentSessionInputSchema,
+  WorkspaceAgentSessionResultSchema,
+  WorkspaceClaimTaskInputSchema,
+  WorkspaceClaimTaskResultSchema,
   WorkspaceDeletePathsInputSchema,
   WorkspaceDeletePathsResultSchema,
   WorkspaceExecInputSchema,
@@ -33,8 +37,16 @@ import {
   WorkspaceImportFileResultSchema,
   WorkspaceMakeDirInputSchema,
   WorkspaceMakeDirResultSchema,
+  WorkspaceOfficialLockInputSchema,
+  WorkspaceOfficialLockResultSchema,
+  WorkspaceOfficialUnlockInputSchema,
+  WorkspaceOfficialUnlockResultSchema,
   WorkspacePolicyExplainInputSchema,
   WorkspacePolicyExplainResultSchema,
+  WorkspaceReapProcessesInputSchema,
+  WorkspaceReapProcessesResultSchema,
+  WorkspaceReleaseTaskInputSchema,
+  WorkspaceReleaseTaskResultSchema,
   WorkspaceReadFileInputSchema,
   WorkspaceReadManyInputSchema,
   WorkspaceWriteFileInputSchema
@@ -74,6 +86,12 @@ export type ToolName =
   | "repo_write_changes"
   | "repo_write_handoff"
   | "workspace_exec"
+  | "workspace_agent_session"
+  | "workspace_claim_task"
+  | "workspace_release_task"
+  | "workspace_acquire_official_lock"
+  | "workspace_release_official_lock"
+  | "workspace_reap_processes"
   | "workspace_export_file"
   | "workspace_create_file_artifact"
   | "workspace_import_file"
@@ -228,6 +246,30 @@ export const toolContracts = {
   workspace_exec: {
     input: WorkspaceExecInputSchema,
     output: WorkspaceExecResultSchema
+  },
+  workspace_agent_session: {
+    input: WorkspaceAgentSessionInputSchema,
+    output: WorkspaceAgentSessionResultSchema
+  },
+  workspace_claim_task: {
+    input: WorkspaceClaimTaskInputSchema,
+    output: WorkspaceClaimTaskResultSchema
+  },
+  workspace_release_task: {
+    input: WorkspaceReleaseTaskInputSchema,
+    output: WorkspaceReleaseTaskResultSchema
+  },
+  workspace_acquire_official_lock: {
+    input: WorkspaceOfficialLockInputSchema,
+    output: WorkspaceOfficialLockResultSchema
+  },
+  workspace_release_official_lock: {
+    input: WorkspaceOfficialUnlockInputSchema,
+    output: WorkspaceOfficialUnlockResultSchema
+  },
+  workspace_reap_processes: {
+    input: WorkspaceReapProcessesInputSchema,
+    output: WorkspaceReapProcessesResultSchema
   },
   workspace_export_file: {
     input: WorkspaceExportFileInputSchema,
