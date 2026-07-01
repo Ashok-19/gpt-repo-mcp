@@ -8,6 +8,8 @@ export const MUTATING_TOOL_NAMES = [
   "repo_write_stage_commit",
   "repo_write_recover",
   "workspace_exec",
+  "workspace_run_script",
+  "workspace_save_file",
   "workspace_run_python",
   "workspace_run_bash",
   "workspace_agent_session",

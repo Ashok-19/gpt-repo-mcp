@@ -64,6 +64,8 @@ import type {
   WorkspaceReleaseTaskInput,
   WorkspaceRunBashInput,
   WorkspaceRunPythonInput,
+  WorkspaceRunScriptInput,
+  WorkspaceSaveFileInput,
   WorkspaceWriteFileInput
 } from "../contracts/workspace.contract.js";
 
@@ -431,6 +433,20 @@ export const workspaceExecHandler: ToolHandler = async (input, context) => safeT
   const result = await workspaceService(repo.root, context).exec(args);
   audit({ tool: "workspace_exec", repo_id: args.repo_id, counts: { exit_code: result.exit_code ?? -1 }, truncated: result.stdout_truncated || result.stderr_truncated });
   return createSuccessEnvelope(result, result.timed_out ? `Command timed out in ${result.duration_ms}ms.` : `Command exited with ${result.exit_code}.`);
+});
+
+export const workspaceRunScriptHandler: ToolHandler = async (input, context) => safeTool<WorkspaceRunScriptInput>("workspace_run_script", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).runScript(args);
+  audit({ tool: "workspace_run_script", repo_id: args.repo_id, paths: [result.script_path], counts: { exit_code: result.exit_code ?? -1 }, truncated: result.stdout_truncated || result.stderr_truncated, agent_id: args.agent_id, warnings: result.timed_out ? ["TIMEOUT"] : undefined });
+  return createSuccessEnvelope(result, result.timed_out ? `Script timed out in ${result.duration_ms}ms.` : `Script exited with ${result.exit_code}.`);
+});
+
+export const workspaceSaveFileHandler: ToolHandler = async (input, context) => safeTool<WorkspaceSaveFileInput>("workspace_save_file", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).saveFile(args);
+  audit({ tool: "workspace_save_file", repo_id: args.repo_id, paths: [result.path], counts: { bytes: result.size_bytes } });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run checked saving ${result.path}.` : `Saved ${result.path}.`);
 });
 
 export const workspaceRunPythonHandler: ToolHandler = async (input, context) => safeTool<WorkspaceRunPythonInput>("workspace_run_python", input, context, async (args) => {

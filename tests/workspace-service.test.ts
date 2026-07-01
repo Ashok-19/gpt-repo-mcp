@@ -190,30 +190,64 @@ describe("WorkspaceService", () => {
     expect(shell.exit_code).toBe(0);
     expect(shell.stdout).toContain("shell-ok");
     expect(shell.generated_script_path).toMatch(/^scratch\/agents\/agent-a\/workspace-runs\/.+\.sh$/);
+
+    const neutral = await service.runScript({
+      agent_id: "agent-a",
+      cwd: ".",
+      runtime: "py",
+      script: "print('neutral-ok')\n",
+      timeout_seconds: 30,
+      reason: "Run neutral script experiment"
+    });
+    expect(neutral.exit_code).toBe(0);
+    expect(neutral.stdout).toContain("neutral-ok");
   });
 
-  test("blocks sudo and network command families", async () => {
+  test("saves binary files directly inside the approved repo", async () => {
+    const fixture = await createRepoFixture();
+    const service = await workspace(fixture.root);
+
+    const result = await service.saveFile({
+      path: "task001/task/model.onnx",
+      data: Buffer.from("ONNX").toString("base64"),
+      encoding: "base64",
+      overwrite: true,
+      create_dirs: true,
+      reason: "Save binary candidate"
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      path: "task001/task/model.onnx",
+      size_bytes: 4,
+      overwritten: false,
+      dry_run: false
+    });
+    await expect(readFile(join(fixture.root, "task001", "task", "model.onnx"))).resolves.toEqual(Buffer.from("ONNX"));
+  });
+
+  test("blocks sudo and high-risk git while allowing network families by default", async () => {
     const fixture = await createRepoFixture();
     const service = await workspace(fixture.root);
 
     await expect(service.exec({ cwd: ".", cmd: ["sudo", "id"], reason: "Probe block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
-    await expect(service.exec({ cwd: ".", cmd: ["curl", "https://example.com"], reason: "Probe block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
-    await expect(service.exec({ cwd: ".", cmd: ["timeout", "5", "curl", "https://example.com"], reason: "Probe timeout wrapper block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
+    await expect(service.exec({ cwd: ".", cmd: ["curl", "https://example.com"], dry_run: true, reason: "Probe network family" })).resolves.toMatchObject({ dry_run: true });
+    await expect(service.exec({ cwd: ".", cmd: ["timeout", "5", "curl", "https://example.com"], dry_run: true, reason: "Probe timeout wrapper" })).resolves.toMatchObject({ dry_run: true });
     await expect(service.exec({ cwd: ".", cmd: ["git", "push"], reason: "Probe block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
     await expect(service.exec({ cwd: ".", cmd: ["python3", "../outside.py"], reason: "Probe path block" })).rejects.toMatchObject({ code: "PATH_TRAVERSAL_REJECTED" });
     await expect(service.exec({ cwd: ".", cmd: ["bash", "-lc", "python3 --version && cat README.md"], reason: "Probe shell operator block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
   });
 
-  test("blocks secret reads and rm outside matching agent scratch through exec", async () => {
+  test("allows repo-local secret reads and rm through exec while still blocking traversal", async () => {
     const fixture = await createRepoFixture();
     const service = await workspace(fixture.root);
     await writeFile(join(fixture.root, ".env"), "TOKEN=secret\n");
     await mkdir(join(fixture.root, "scratch"), { recursive: true });
     await writeFile(join(fixture.root, "scratch", "delete-me.txt"), "temporary\n");
 
-    await expect(service.exec({ cwd: ".", cmd: ["cat", ".env"], reason: "Probe secret cat block" })).rejects.toMatchObject({ code: "SECRET_CANDIDATE_BLOCKED" });
-    await expect(service.exec({ cwd: ".", cmd: ["rm", "scratch/delete-me.txt"], reason: "Probe rm without agent block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
-    await expect(service.exec({ agent_id: "agent-a", cwd: ".", cmd: ["rm", "scratch/delete-me.txt"], reason: "Probe rm outside agent block" })).rejects.toMatchObject({ code: "WRITE_NOT_ALLOWED_GLOB" });
+    await expect(service.exec({ cwd: ".", cmd: ["cat", ".env"], reason: "Read repo-local env file" })).resolves.toMatchObject({ exit_code: 0, stdout: "TOKEN=secret\n" });
+    await expect(service.exec({ cwd: ".", cmd: ["rm", "scratch/delete-me.txt"], reason: "Remove repo-local scratch file" })).resolves.toMatchObject({ exit_code: 0 });
+    await expect(service.exec({ cwd: ".", cmd: ["rm", "../outside.txt"], reason: "Probe traversal block" })).rejects.toMatchObject({ code: "PATH_TRAVERSAL_REJECTED" });
   });
 
   test("times out long-running commands and returns partial output metadata", async () => {
@@ -357,7 +391,7 @@ describe("WorkspaceService", () => {
     expect(nested.entries.some((entry) => entry.path === "task349/ARC-GEN/README.md")).toBe(true);
   });
 
-  test("workspace_write_file allows scratch paths and denies protected paths", async () => {
+  test("workspace_write_file allows approved repo-local paths", async () => {
     const fixture = await createRepoFixture();
     const runtime = await context(fixture.root);
 
@@ -372,15 +406,15 @@ describe("WorkspaceService", () => {
     expect(allowed.isError).toBeUndefined();
     expect(await readFile(join(fixture.root, "scratch", "result.txt"), "utf8")).toBe("ok\n");
 
-    const denied = await workspaceWriteFileHandler({
+    const repoWrite = await workspaceWriteFileHandler({
       repo_id: "repo",
       path: "src/app.ts",
       action: "write",
-      content: "blocked\n",
-      reason: "Probe denied write"
+      content: "export const updated = true;\n",
+      reason: "Write repo-local source file"
     }, runtime);
-    expect(denied.isError).toBe(true);
-    expect(denied.structuredContent).toMatchObject({ error: { code: "WRITE_NOT_ALLOWED_GLOB" } });
+    expect(repoWrite.isError).toBeUndefined();
+    expect(await readFile(join(fixture.root, "src", "app.ts"), "utf8")).toBe("export const updated = true;\n");
   });
 
   test("delete dry run reports explicit scratch paths without deleting", async () => {
@@ -414,7 +448,7 @@ describe("WorkspaceService", () => {
     await expect(readFile(join(fixture.root, "scratch", "run1", "tmp.txt"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  test("cleanup refuses tracked files, traversal, and broad globs", async () => {
+  test("cleanup allows explicit untracked repo paths and refuses tracked files, traversal, and broad globs", async () => {
     const fixture = await createRepoFixture();
     await mkdir(join(fixture.root, "scratch"), { recursive: true });
     await writeFile(join(fixture.root, "scratch", "tracked.txt"), "tracked\n");
@@ -427,10 +461,9 @@ describe("WorkspaceService", () => {
       reason: "Probe cleanup refusal"
     });
 
-    expect(result.deleted).toEqual([]);
+    expect(result.deleted).toEqual([{ path: "src/app.ts", type: "file" }]);
     expect(result.skipped).toEqual([
       { path: "scratch/tracked.txt", reason: "CLEANUP_TRACKED_PATH" },
-      { path: "src/app.ts", reason: "CLEANUP_NOT_ALLOWED_GLOB" },
       { path: "../outside", reason: "PATH_TRAVERSAL_REJECTED" },
       { path: "scratch/*.txt", reason: "CLEANUP_UNSAFE_PATH" }
     ]);

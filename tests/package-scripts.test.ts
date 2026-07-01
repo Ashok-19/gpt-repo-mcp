@@ -40,6 +40,13 @@ describe("package startup scripts", () => {
     expect(script).toContain("/t/${publicPathToken}/mcp");
     expect(script).toContain("This is guess-resistance only, not authentication");
     expect(script).toContain("127.0.0.1:4040/api/tunnels");
+    expect(script).toContain("MCP_HEALTH_URL");
+    expect(script).toContain("dist/server.js");
+    expect(script).toContain("GPT_REPO_CONNECT_USE_DEV");
+    expect(script).toContain("GPT_REPO_NGROK_DOMAIN");
+    expect(script).toContain("waitForLocalHealth");
+    expect(script).toContain("tunnelTargetsLocalMcpPort");
+    expect(script).toContain("Restarting in");
     expect(script).toContain("ChatGPT MCP URL");
     expect(script).toContain("Reusing existing ngrok tunnel");
     expect(script).toContain("readNgrokHttpsUrl");

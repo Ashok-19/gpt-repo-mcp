@@ -18,7 +18,9 @@ import type {
   WorkspaceImportFileInput,
   WorkspaceMakeDirInput,
   WorkspaceRunBashInput,
-  WorkspaceRunPythonInput
+  WorkspaceRunPythonInput,
+  WorkspaceRunScriptInput,
+  WorkspaceSaveFileInput
 } from "../contracts/workspace.contract.js";
 
 const execFileAsync = promisify(execFile);
@@ -26,37 +28,6 @@ const textDecoder = new TextDecoder("utf-8", { fatal: true });
 const MUTATING_FILE_COMMANDS = new Set(["cp", "mv", "mkdir", "rm"]);
 const NETWORK_COMMANDS = new Set(["ssh", "scp", "rsync", "curl", "wget", "nc", "ncat", "telnet", "ftp"]);
 const SUDO_COMMANDS = new Set(["sudo", "su", "passwd"]);
-const GENERIC_ALLOWED = new Set([
-  "python",
-  "python3",
-  "python3.12",
-  "node",
-  "npm",
-  "npx",
-  "bash",
-  "sh",
-  "ls",
-  "find",
-  "stat",
-  "du",
-  "cat",
-  "head",
-  "tail",
-  "grep",
-  "sed",
-  "awk",
-  "cp",
-  "mv",
-  "mkdir",
-  "rm",
-  "zip",
-  "unzip",
-  "tar",
-  "git",
-  "timeout"
-]);
-const GIT_ALLOWED = new Set(["status", "diff", "log", "rev-parse"]);
-const NPM_BLOCKED = new Set(["install", "i", "add", "update", "upgrade", "publish", "audit", "fund", "login"]);
 const PATH_LIKE_EXTENSIONS = new Set([
   ".py",
   ".js",
@@ -97,7 +68,7 @@ export class WorkspaceService {
     const policyCmd = this.unwrapCommandForPolicy(cmd);
     await this.assertNoOutsideAbsolutePaths(policyCmd);
     await this.assertPathLikeArgsInsideRoot(cwd.repoPath, policyCmd);
-    await this.assertCommandPathEffects(cwd.repoPath, policyCmd, input.agent_id);
+    await this.assertCommandPathEffects(cwd.repoPath, policyCmd);
 
     const timeoutSeconds = Math.min(
       input.timeout_seconds ?? this.policy.config.exec_default_timeout_seconds,
@@ -236,6 +207,61 @@ export class WorkspaceService {
     };
   }
 
+  async runScript(input: Omit<WorkspaceRunScriptInput, "repo_id">) {
+    if ((input.script ? 1 : 0) + (input.script_path ? 1 : 0) !== 1) {
+      throw new RepoReaderError("VALIDATION_ERROR", "Provide exactly one of script or script_path.");
+    }
+    const runtime = input.runtime ?? "py";
+    if (runtime === "py") {
+      return await this.runPython({
+        ...input,
+        code: input.script,
+        python: "python3"
+      });
+    }
+    if (runtime === "node") {
+      return await this.runNode(input);
+    }
+    return await this.runBash({
+      ...input,
+      shell: "bash"
+    });
+  }
+
+  async saveFile(input: Omit<WorkspaceSaveFileInput, "repo_id">) {
+    this.policy.assertReason(input.reason);
+    const repoPath = this.assertRepoMutablePath(input.path);
+    const target = await this.resolveWriteTarget(repoPath, input.create_dirs ?? true);
+    const content = decodeSaveFileData(input.data, input.encoding ?? "utf8");
+    let overwritten = false;
+    try {
+      const existing = await lstat(target);
+      if (existing.isDirectory()) {
+        throw new RepoReaderError("UNSUPPORTED_FILE_TYPE", `Save target is a directory: ${repoPath}`);
+      }
+      overwritten = true;
+      if (!input.overwrite) {
+        throw new RepoReaderError("WRITE_TARGET_EXISTS", `Destination already exists: ${repoPath}`);
+      }
+    } catch (error) {
+      if (!isNotFoundError(error)) {
+        throw error;
+      }
+    }
+    if (!input.dry_run) {
+      await writeFile(target, content);
+    }
+    return {
+      ok: true as const,
+      path: repoPath,
+      size_bytes: content.byteLength,
+      sha256: sha256(content),
+      mime: guessMime(repoPath),
+      overwritten,
+      dry_run: input.dry_run ?? false
+    };
+  }
+
   async exportFile(input: Omit<WorkspaceExportFileInput, "repo_id">) {
     this.policy.assertReason(input.reason);
     const requestedPath = validateRepoPath(input.path);
@@ -358,7 +384,7 @@ export class WorkspaceService {
 
   async makeDir(input: Omit<WorkspaceMakeDirInput, "repo_id">) {
     this.policy.assertReason(input.reason);
-    const repoPath = this.policy.assertWritePath(input.path);
+    const repoPath = this.assertRepoMutablePath(input.path);
     const absolutePath = await this.resolveWriteTarget(repoPath, true);
     const existed = await exists(absolutePath);
     if (!input.dry_run && !existed) {
@@ -501,8 +527,8 @@ export class WorkspaceService {
     cwd: string;
     inlineContent?: string;
     scriptPath?: string;
-    extension: "py" | "sh";
-    label: "python" | "bash";
+    extension: "py" | "sh" | "js";
+    label: "python" | "bash" | "node" | "script";
   }): Promise<{ repoPath: string; execPath: string; generated: boolean }> {
     if ((input.inlineContent ? 1 : 0) + (input.scriptPath ? 1 : 0) !== 1) {
       throw new RepoReaderError("VALIDATION_ERROR", `Provide exactly one of ${input.label === "python" ? "code" : "script"} or script_path.`);
@@ -525,6 +551,47 @@ export class WorkspaceService {
     return { repoPath, execPath: absolutePath, generated: true };
   }
 
+  private async runNode(input: Omit<WorkspaceRunScriptInput, "repo_id">) {
+    this.policy.assertReason(input.reason);
+    const prepared = await this.prepareRunnableScript({
+      agentId: input.agent_id,
+      cwd: input.cwd ?? ".",
+      inlineContent: input.script,
+      scriptPath: input.script_path,
+      extension: "js",
+      label: "node"
+    });
+    const interpreter = "node";
+    const result = await this.exec({
+      agent_id: input.agent_id,
+      cwd: input.cwd ?? ".",
+      cmd: [interpreter, prepared.execPath, ...(input.args ?? [])],
+      timeout_seconds: input.timeout_seconds,
+      max_stdout_bytes: input.max_stdout_bytes,
+      max_stderr_bytes: input.max_stderr_bytes,
+      env: input.env,
+      dry_run: input.dry_run,
+      reason: input.reason
+    });
+    return {
+      ...result,
+      interpreter,
+      script_path: prepared.repoPath,
+      ...(prepared.generated ? { generated_script_path: prepared.repoPath } : {})
+    };
+  }
+
+  private assertRepoMutablePath(path: string): string {
+    const repoPath = validateRepoPath(path);
+    if (repoPath === ".") {
+      throw new RepoReaderError("WRITE_NOT_ALLOWED_GLOB", "Repository root is not a file target.");
+    }
+    if (repoPath === ".git" || repoPath.startsWith(".git/")) {
+      throw new RepoReaderError("WRITE_NOT_ALLOWED_GLOB", `Git internals are not writable through workspace tools: ${repoPath}`);
+    }
+    return repoPath;
+  }
+
   private assertCommandAllowed(cmd: string[], depth = 0): void {
     if (depth > 3) {
       throw new RepoReaderError("VALIDATION_ERROR", "Nested command wrappers are too deep.");
@@ -539,20 +606,12 @@ export class WorkspaceService {
     if (this.policy.config.exec_block_network && NETWORK_COMMANDS.has(exe)) {
       throw new RepoReaderError("OPERATIONS_DISABLED", `Network command is blocked: ${exe}`);
     }
-    if (!GENERIC_ALLOWED.has(exe) && !isRepoLocalExecutable(cmd[0] ?? "")) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", `Command family is not allowed: ${exe}`);
-    }
     if (exe === "git") {
       const subcommand = cmd.find((arg, index) => index > 0 && !arg.startsWith("-"));
-      if (!subcommand || !GIT_ALLOWED.has(subcommand)) {
+      const blocked = new Set(["push", "reset", "clean", "checkout", "switch"]);
+      if (subcommand && blocked.has(subcommand)) {
         throw new RepoReaderError("OPERATIONS_DISABLED", `Git subcommand is blocked: ${subcommand ?? ""}`);
       }
-    }
-    if (exe === "npm" && cmd.some((arg, index) => index > 0 && NPM_BLOCKED.has(arg))) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", "npm network/install commands are blocked.");
-    }
-    if (exe === "npx" && !cmd.includes("--no-install") && !cmd.includes("--offline")) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", "npx requires --no-install or --offline.");
     }
     if (exe === "timeout") {
       this.assertCommandAllowed(parseTimeoutWrappedCommand(cmd), depth + 1);
@@ -599,9 +658,6 @@ export class WorkspaceService {
         continue;
       }
       const repoPath = await this.normalizeCommandPathArg(cwdRepoPath, arg);
-      if (this.policy.isSecretPath(repoPath)) {
-        throw new RepoReaderError("SECRET_CANDIDATE_BLOCKED", `Secret candidate blocked: ${repoPath}`);
-      }
       const absolutePath = join(this.root, repoPath);
       try {
         const rootReal = await realpath(this.root);
@@ -618,7 +674,7 @@ export class WorkspaceService {
     }
   }
 
-  private async assertCommandPathEffects(cwdRepoPath: string, cmd: string[], agentId?: string): Promise<void> {
+  private async assertCommandPathEffects(cwdRepoPath: string, cmd: string[]): Promise<void> {
     const exe = basename(cmd[0] ?? "");
     if (exe === "bash" || exe === "sh") {
       const script = cmd[1] ?? "";
@@ -638,12 +694,9 @@ export class WorkspaceService {
     if (exe === "cp") {
       for (const source of pathArgs.slice(0, -1)) {
         const sourcePath = await this.normalizeCommandPathArg(cwdRepoPath, source);
-        if (this.policy.isSecretPath(sourcePath)) {
-          throw new RepoReaderError("SECRET_CANDIDATE_BLOCKED", `Secret candidate blocked: ${sourcePath}`);
-        }
         await this.sandbox.resolve(sourcePath);
       }
-      this.policy.assertWritePath(await this.normalizeCommandPathArg(cwdRepoPath, pathArgs[pathArgs.length - 1] ?? ""));
+      this.assertRepoMutablePath(await this.normalizeCommandPathArg(cwdRepoPath, pathArgs[pathArgs.length - 1] ?? ""));
       return;
     }
     for (const arg of pathArgs) {
@@ -651,11 +704,7 @@ export class WorkspaceService {
       if (arg === "/" || arg === "." || repoPath === ".") {
         throw new RepoReaderError("OPERATIONS_DISABLED", `Unsafe ${exe} target rejected: ${arg}`);
       }
-      if (exe === "rm") {
-        this.assertAgentScratchPath(repoPath, agentId);
-      } else {
-        this.policy.assertWritePath(repoPath);
-      }
+      this.assertRepoMutablePath(repoPath);
     }
   }
 
@@ -686,17 +735,6 @@ export class WorkspaceService {
       return normalizeRelative(relative(rootReal, candidate));
     }
     return validateRepoPath(cwdRepoPath === "." ? arg : `${cwdRepoPath}/${arg}`);
-  }
-
-  private assertAgentScratchPath(repoPath: string, agentId?: string): void {
-    if (!agentId) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", "rm through workspace_exec requires agent_id and is limited to that agent scratch directory.");
-    }
-    const agentRoot = `scratch/agents/${agentId}`;
-    if (repoPath === agentRoot || !repoPath.startsWith(`${agentRoot}/`)) {
-      throw new RepoReaderError("WRITE_NOT_ALLOWED_GLOB", `rm is limited to ${agentRoot}/ paths.`);
-    }
-    this.policy.assertDeletePath(repoPath);
   }
 
   private async isTracked(repoPath: string): Promise<boolean> {
@@ -759,8 +797,17 @@ function sha256(content: Buffer): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
-function isRepoLocalExecutable(command: string): boolean {
-  return command.startsWith("./") || command.startsWith("../") || command.includes("/");
+function decodeSaveFileData(data: string, encoding: "utf8" | "base64" | "hex"): Buffer {
+  if (encoding === "utf8") {
+    return Buffer.from(data, "utf8");
+  }
+  if (encoding === "hex") {
+    if (!/^(?:[0-9a-fA-F]{2})*$/.test(data)) {
+      throw new RepoReaderError("VALIDATION_ERROR", "hex data must contain an even number of hexadecimal characters.");
+    }
+    return Buffer.from(data, "hex");
+  }
+  return Buffer.from(data, "base64");
 }
 
 function isPathLikeArg(arg: string): boolean {

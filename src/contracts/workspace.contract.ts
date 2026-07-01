@@ -60,6 +60,31 @@ export const WorkspaceRunBashInputSchema = RunScriptCommonSchema.extend({
   script: z.string().min(1).optional()
 });
 
+export const WorkspaceRunScriptInputSchema = RunScriptCommonSchema.extend({
+  runtime: z.enum(["py", "posix", "node"]).default("py"),
+  script: z.string().min(1).optional()
+});
+
+export const WorkspaceSaveFileInputSchema = RepoInputSchema.extend({
+  path: z.string().min(1),
+  data: z.string(),
+  encoding: z.enum(["utf8", "base64", "hex"]).default("utf8"),
+  overwrite: z.boolean().optional(),
+  create_dirs: z.boolean().optional(),
+  dry_run: z.boolean().optional(),
+  reason: ReasonSchema
+});
+
+export const WorkspaceSaveFileResultSchema = z.object({
+  ok: z.literal(true),
+  path: z.string(),
+  size_bytes: z.number().int().nonnegative(),
+  sha256: z.string(),
+  mime: z.string().optional(),
+  overwritten: z.boolean(),
+  dry_run: z.boolean()
+});
+
 export const WorkspaceExportFileInputSchema = RepoInputSchema.extend({
   path: z.string().min(1),
   max_bytes: z.number().int().positive().optional(),
@@ -307,6 +332,8 @@ export const WorkspaceReapProcessesResultSchema = z.object({
 export type WorkspaceExecInput = z.infer<typeof WorkspaceExecInputSchema>;
 export type WorkspaceRunPythonInput = z.input<typeof WorkspaceRunPythonInputSchema>;
 export type WorkspaceRunBashInput = z.input<typeof WorkspaceRunBashInputSchema>;
+export type WorkspaceRunScriptInput = z.input<typeof WorkspaceRunScriptInputSchema>;
+export type WorkspaceSaveFileInput = z.input<typeof WorkspaceSaveFileInputSchema>;
 export type WorkspaceExportFileInput = z.infer<typeof WorkspaceExportFileInputSchema>;
 export type WorkspaceImportFileInput = z.infer<typeof WorkspaceImportFileInputSchema>;
 export type WorkspaceFileInfoInput = z.infer<typeof WorkspaceFileInfoInputSchema>;

@@ -52,6 +52,8 @@ import {
   workspaceReleaseTaskHandler,
   workspaceRunBashHandler,
   workspaceRunPythonHandler,
+  workspaceRunScriptHandler,
+  workspaceSaveFileHandler,
   workspaceReadFileHandler,
   workspaceReadManyHandler,
   workspaceSearchHandler,
@@ -388,6 +390,24 @@ const fullToolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.workspace_exec.output,
     annotations: writeAnnotations,
     handler: workspaceExecHandler
+  },
+  {
+    name: "workspace_run_script",
+    title: "Run workspace script",
+    description: descriptions.workspace_run_script,
+    inputSchema: toolContracts.workspace_run_script.input,
+    outputSchema: toolContracts.workspace_run_script.output,
+    annotations: writeAnnotations,
+    handler: workspaceRunScriptHandler
+  },
+  {
+    name: "workspace_save_file",
+    title: "Save workspace file",
+    description: descriptions.workspace_save_file,
+    inputSchema: toolContracts.workspace_save_file.input,
+    outputSchema: toolContracts.workspace_save_file.output,
+    annotations: writeAnnotations,
+    handler: workspaceSaveFileHandler
   },
   {
     name: "workspace_run_python",

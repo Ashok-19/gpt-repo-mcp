@@ -49,7 +49,10 @@ import {
   WorkspaceReleaseTaskResultSchema,
   WorkspaceRunBashInputSchema,
   WorkspaceRunPythonInputSchema,
+  WorkspaceRunScriptInputSchema,
   WorkspaceRunScriptResultSchema,
+  WorkspaceSaveFileInputSchema,
+  WorkspaceSaveFileResultSchema,
   WorkspaceReadFileInputSchema,
   WorkspaceReadManyInputSchema,
   WorkspaceWriteFileInputSchema
@@ -89,6 +92,8 @@ export type ToolName =
   | "repo_write_changes"
   | "repo_write_handoff"
   | "workspace_exec"
+  | "workspace_run_script"
+  | "workspace_save_file"
   | "workspace_agent_session"
   | "workspace_claim_task"
   | "workspace_release_task"
@@ -251,6 +256,14 @@ export const toolContracts = {
   workspace_exec: {
     input: WorkspaceExecInputSchema,
     output: WorkspaceExecResultSchema
+  },
+  workspace_run_script: {
+    input: WorkspaceRunScriptInputSchema,
+    output: WorkspaceRunScriptResultSchema
+  },
+  workspace_save_file: {
+    input: WorkspaceSaveFileInputSchema,
+    output: WorkspaceSaveFileResultSchema
   },
   workspace_run_python: {
     input: WorkspaceRunPythonInputSchema,

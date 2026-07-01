@@ -40,6 +40,16 @@ describe("MCP contract", () => {
     }
   });
 
+  test("http server uses JSON transport responses for proxy reliability", async () => {
+    const serverSource = await import("node:fs/promises").then((fs) => fs.readFile("src/server.ts", "utf8"));
+
+    expect(serverSource).toContain("GPT_REPO_MCP_JSON_RESPONSE");
+    expect(serverSource).toContain("enableJsonResponse: useJsonTransportResponses");
+    expect(serverSource).toContain("Parse error: invalid JSON request body");
+    expect(serverSource).toContain("unhandledRejection");
+    expect(serverSource).toContain("rss_mb");
+  });
+
   test("tools/list exposes schemas and appropriate annotations for every tool", async () => {
     const { client, close } = await connectFixtureServer();
     try {
@@ -70,6 +80,8 @@ describe("MCP contract", () => {
 
       expect(names.has("workspace_create_file_artifact")).toBe(true);
       expect(names.has("workspace_cleanup_paths")).toBe(true);
+      expect(names.has("workspace_run_python")).toBe(true);
+      expect(names.has("workspace_run_bash")).toBe(true);
       expect(names.has("workspace_export_file")).toBe(false);
       expect(names.has("workspace_delete_paths")).toBe(false);
     } finally {
@@ -812,6 +824,78 @@ describe("MCP contract", () => {
               "timed_out",
             ],
             "title": "Run approved workspace command",
+          },
+          {
+            "annotations": {
+              "destructiveHint": true,
+              "idempotentHint": false,
+              "openWorldHint": false,
+              "readOnlyHint": false,
+            },
+            "description": "Use this when the user asks to run repo-local experiments or validation steps. Inline script text is materialized under workspace scratch and then run with bounded output.",
+            "inputKeys": [
+              "agent_id",
+              "args",
+              "cwd",
+              "dry_run",
+              "env",
+              "max_stderr_bytes",
+              "max_stdout_bytes",
+              "reason",
+              "repo_id",
+              "runtime",
+              "script",
+              "script_path",
+              "timeout_seconds",
+            ],
+            "name": "workspace_run_script",
+            "outputKeys": [
+              "agent_id",
+              "cmd",
+              "cwd",
+              "dry_run",
+              "duration_ms",
+              "exit_code",
+              "generated_script_path",
+              "interpreter",
+              "script_path",
+              "stderr",
+              "stderr_truncated",
+              "stdout",
+              "stdout_truncated",
+              "timed_out",
+            ],
+            "title": "Run workspace script",
+          },
+          {
+            "annotations": {
+              "destructiveHint": true,
+              "idempotentHint": false,
+              "openWorldHint": false,
+              "readOnlyHint": false,
+            },
+            "description": "Use this when the user asks to save UTF-8, base64, or hex data to an approved repo-local path, including binary artifacts, without relying on a command runner.",
+            "inputKeys": [
+              "create_dirs",
+              "data",
+              "dry_run",
+              "encoding",
+              "overwrite",
+              "path",
+              "reason",
+              "repo_id",
+            ],
+            "name": "workspace_save_file",
+            "outputKeys": [
+              "dry_run",
+              "mime",
+              "ok",
+              "overwritten",
+              "path",
+              "sha256",
+              "size_bytes",
+            ],
+            "title": "Save workspace file",
           },
           {
             "annotations": {
@@ -1615,6 +1699,8 @@ function representativeCalls(head: string, root: string): Record<string, Record<
     dry_run: true
   },
   workspace_exec: { repo_id: "fixture", cwd: ".", cmd: ["python3", "--version"], timeout_seconds: 30, reason: "Smoke test" },
+  workspace_run_script: { repo_id: "fixture", agent_id: "smoke-agent", cwd: ".", runtime: "py", script: "print('script-smoke')\n", timeout_seconds: 30, reason: "Smoke script runner" },
+  workspace_save_file: { repo_id: "fixture", path: "scratch/tool-tests/saved.bin", data: "T05OWA==", encoding: "base64", overwrite: true, reason: "Smoke file save" },
   workspace_run_python: { repo_id: "fixture", agent_id: "smoke-agent", cwd: ".", code: "print('python-smoke')\n", timeout_seconds: 30, reason: "Smoke Python runner" },
   workspace_run_bash: { repo_id: "fixture", agent_id: "smoke-agent", cwd: ".", script: "echo bash-smoke\n", timeout_seconds: 30, reason: "Smoke shell runner" },
   workspace_agent_session: { repo_id: "fixture", agent_id: "smoke-agent", task_id: "task001", create_dirs: true, reason: "Smoke session" },

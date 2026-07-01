@@ -19,30 +19,11 @@ export const DEFAULT_WORKSPACE_POLICY: WorkspacePolicyDefaults = {
   exec_max_timeout_seconds: 1800,
   exec_max_output_bytes: 200000,
   exec_allowed_roots: [] as string[],
-  exec_write_allowed_globs: [
-    ".chatgpt/**",
-    "experiments/**",
-    "scratch/**",
-    "tmp/**",
-    "task*/experiments/**",
-    "task*/scratch/**",
-    "task*/tmp/**"
-  ],
-  exec_block_network: true,
+  exec_write_allowed_globs: ["**"],
+  exec_block_network: false,
   exec_block_sudo: true,
   exec_require_reason: true,
   export_max_bytes: 200000000,
   export_dir: "",
-  delete_allowed_globs: [
-    ".chatgpt/**",
-    "experiments/**",
-    "scratch/**",
-    "tmp/**",
-    "task*/experiments/**",
-    "task*/scratch/**",
-    "task*/tmp/**",
-    "coverage/**",
-    "dist/**",
-    "test-results/**"
-  ]
+  delete_allowed_globs: ["**"]
 };

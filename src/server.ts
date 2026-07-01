@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import express, { type Request, type Response } from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { RootRegistry } from "./services/root-registry.js";
@@ -17,21 +17,122 @@ import {
 const port = Number(process.env.PORT ?? 8787);
 const configPath = process.env.GPT_REPO_CONFIG ?? process.env.REPO_READER_CONFIG;
 const publicPathToken = process.env.GPT_REPO_PUBLIC_PATH_TOKEN ?? process.env.REPO_READER_PUBLIC_PATH_TOKEN;
+const httpBodyLimit = process.env.GPT_REPO_HTTP_BODY_LIMIT ?? process.env.REPO_READER_HTTP_BODY_LIMIT ?? "50mb";
+const useJsonTransportResponses = (process.env.GPT_REPO_MCP_JSON_RESPONSE ?? "true") !== "false";
 
 const registry = configPath
   ? await RootRegistry.fromFile(configPath)
   : await RootRegistry.fromConfig({ repos: [], limits: {} });
 const context: RuntimeContext = { registry };
 
+function logRuntimeError(event: "unhandled_rejection" | "uncaught_exception", error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(JSON.stringify({ level: "error", event, message: message.slice(0, 300) }));
+}
+
+process.on("unhandledRejection", (reason) => {
+  logRuntimeError("unhandled_rejection", reason);
+});
+
+process.on("uncaughtExceptionMonitor", (error) => {
+  logRuntimeError("uncaught_exception", error);
+});
+
 const app = express();
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: httpBodyLimit }));
+app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (!isHttpBodyParseError(error)) {
+    next(error);
+    return;
+  }
+
+  const requestId = createRequestId();
+  requestAudit({
+    event: "mcp_request_error",
+    request_id: requestId,
+    http_method: req.method,
+    route: sanitizeMcpRouteForAudit(req.path),
+    status_code: error.status,
+    duration_ms: 0,
+    mcp_session: typeof req.headers["mcp-session-id"] === "string" ? "present" : "missing",
+    mcp_method: "parse"
+  });
+  res.status(error.status).json({
+    jsonrpc: "2.0",
+    error: {
+      code: error.status === 413 ? -32000 : -32700,
+      message: error.status === 413 ? "Request body too large" : "Parse error: invalid JSON request body"
+    },
+    id: null
+  });
+});
 
 const transports: Record<string, StreamableHTTPServerTransport> = {};
 const mcpRoutePatterns = buildMcpRoutePatterns(publicPathToken);
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, name: "gpt-repo-mcp" });
+  const memory = process.memoryUsage();
+  res.json({
+    ok: true,
+    name: "gpt-repo-mcp",
+    uptime_seconds: Math.floor(process.uptime()),
+    sessions: Object.keys(transports).length,
+    rss_mb: Math.round(memory.rss / 1024 / 1024)
+  });
 });
+
+function isHttpBodyParseError(error: unknown): error is { status: number } {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const candidate = error as { status?: unknown; type?: unknown };
+  return typeof candidate.status === "number"
+    && (candidate.type === "entity.parse.failed" || candidate.type === "entity.too.large");
+}
+
+function createTransport(): StreamableHTTPServerTransport {
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => randomUUID(),
+    enableJsonResponse: useJsonTransportResponses,
+    onsessioninitialized: (newSessionId) => {
+      transports[newSessionId] = transport;
+      requestAudit({
+        event: "mcp_request_start",
+        request_id: createRequestId(),
+        http_method: "MCP",
+        route: "/mcp",
+        mcp_session: "present",
+        agent_id: agentIdFromSessionId(newSessionId),
+        mcp_method: "session_initialized"
+      });
+    },
+    onsessionclosed: (closedSessionId) => {
+      delete transports[closedSessionId];
+    }
+  });
+
+  transport.onclose = () => {
+    const closedSessionId = transport.sessionId;
+    if (closedSessionId) {
+      delete transports[closedSessionId];
+    }
+  };
+  transport.onerror = (error) => {
+    requestAudit({
+      event: "mcp_request_error",
+      request_id: createRequestId(),
+      http_method: "MCP",
+      route: "/mcp",
+      status_code: 500,
+      mcp_session: transport.sessionId ? "present" : "missing",
+      agent_id: transport.sessionId ? agentIdFromSessionId(transport.sessionId) : undefined,
+      mcp_method: "transport_error",
+      mcp_tool: error.message.slice(0, 80)
+    });
+  };
+
+  return transport;
+}
 
 function createMcpRequestContext(req: Request): RequestTelemetryContext {
   const method = typeof req.body?.method === "string" ? req.body.method : undefined;
@@ -104,20 +205,7 @@ app.post(mcpRoutePatterns, async (req: Request, res: Response) => {
       if (typeof sessionId === "string" && transports[sessionId]) {
         transport = transports[sessionId];
       } else if (!sessionId && isInitializeRequest(req.body)) {
-        transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-          onsessioninitialized: (newSessionId) => {
-            if (transport) {
-              transports[newSessionId] = transport;
-            }
-          }
-        });
-        transport.onclose = () => {
-          const closedSessionId = transport?.sessionId;
-          if (closedSessionId) {
-            delete transports[closedSessionId];
-          }
-        };
+        transport = createTransport();
         await createMcpServer(context).connect(transport);
       } else {
         res.status(400).json({
@@ -246,7 +334,11 @@ app.delete(mcpRoutePatterns, async (req: Request, res: Response) => {
   });
 });
 
-app.listen(port, () => {
+const httpServer = app.listen(port, () => {
   const localPath = publicPathToken ? "/t/[token]/mcp" : "/mcp";
   console.error(`gpt-repo-mcp listening on http://localhost:${port}${localPath}`);
 });
+
+httpServer.requestTimeout = 0;
+httpServer.keepAliveTimeout = 120_000;
+httpServer.headersTimeout = 130_000;
