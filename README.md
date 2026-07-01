@@ -63,6 +63,27 @@ npm run add -- /path/to/your/repo --mode ship
 
 ### 3. Connect ChatGPT
 
+Create one stable public path token before your first connection:
+
+```bash
+GPT_REPO_PUBLIC_PATH_TOKEN="$(openssl rand -hex 32)"
+printf '\n# GPT Repo MCP public path token\nexport GPT_REPO_PUBLIC_PATH_TOKEN="%s"\n' "$GPT_REPO_PUBLIC_PATH_TOKEN" >> ~/.bashrc
+source ~/.bashrc
+echo "$GPT_REPO_PUBLIC_PATH_TOKEN"
+```
+
+The token is used in the public MCP URL path:
+
+```text
+/t/<GPT_REPO_PUBLIC_PATH_TOKEN>/mcp
+```
+
+It is guess-resistance for your ngrok URL path, not full authentication. Anyone with the complete printed URL can reach the MCP endpoint while the tunnel is running. Stop `npm run connect` with `Ctrl+C` when you are done.
+
+If you do not set `GPT_REPO_PUBLIC_PATH_TOKEN`, `npm run connect` generates a random token each time it starts, so the ChatGPT connector URL changes on every restart.
+
+Then start the local MCP server and ngrok tunnel:
+
 ```bash
 npm run connect
 ```
@@ -81,6 +102,8 @@ Use GPT Repo MCP. Which repositories can you access?
 
 Need help choosing **Server URL** vs **Tunnel ID**? See [ChatGPT connector setup](docs/CHATGPT_CONNECT.md#server-url-or-tunnel).
 
+After a system restart, run `npm run connect` again and paste the newly printed URL into ChatGPT if the ngrok host changed. If the machine stays up and `npm run connect` is still running, you do not need to reconnect.
+
 ```text
 Clone -> Install -> Add repo -> Choose mode -> Connect ChatGPT -> Start working
 ```
@@ -93,7 +116,7 @@ Clone -> Install -> Add repo -> Choose mode -> Connect ChatGPT -> Start working
 | `write` | Daily implementation help | Everything in `read`, plus repo file writes guarded by policy, path checks, secret checks, and size limits. |
 | `ship` | Local commit prep | Everything in `write`, plus local stage, commit, recover, and cleanup operations after approval. |
 
-No mode enables push, pull, reset, checkout, switch, rebase, merge, stash, force, branch deletion, shell execution, or arbitrary command execution.
+No mode enables push, pull, reset, checkout, switch, rebase, merge, stash, force, or branch deletion. Repo-local command execution is available through workspace tools and remains scoped to approved repo roots with cwd, path, timeout, output, network, admin-command, and secret-path checks.
 
 ## Example ChatGPT Prompts
 
@@ -145,9 +168,13 @@ Codex is done. Review the Codex result and the git diff for <repo_id>.
 | Git review | `repo_git_status`, `repo_git_diff`, `repo_git_review` |
 | File writes | `repo_write_file`, `repo_write_changes` |
 | ChatGPT session continuity | `repo_write_handoff`, `repo_last_write` |
-| Local ship flow | `repo_write_stage`, `repo_write_unstage`, `repo_write_commit`, `repo_write_stage_commit`, `repo_write_recover`, `repo_cleanup_paths` |
-| Compatibility aliases | `repo_git_stage`, `repo_git_unstage`, `repo_git_commit` |
 | Codex/Claude coordination | `repo_prepare_codex_task`, `repo_write_codex_task`, `repo_codex_review` |
+| Local ship flow | `repo_write_stage_commit`, `repo_write_recover` |
+| Workspace execution | `workspace_exec`, `workspace_run_python`, `workspace_run_bash`, `workspace_reap_processes` |
+| Workspace artifacts | `workspace_create_file_artifact`, `workspace_import_file`, `workspace_file_info` |
+| Workspace scratch writes | `workspace_write_file`, `workspace_apply_patch`, `workspace_make_dir`, `workspace_cleanup_paths` |
+| Parallel-agent coordination | `workspace_agent_session`, `workspace_claim_task`, `workspace_release_task`, `workspace_acquire_official_lock`, `workspace_release_official_lock` |
+| Workspace policy help | `workspace_policy_explain` |
 
 See [docs/TOOL_SURFACE.md](docs/TOOL_SURFACE.md) for full schemas, examples, output shapes, and recommended workflows.
 
@@ -198,13 +225,14 @@ Use `repo_write_handoff` when you want ChatGPT to write local context for a futu
 
 ## Boundaries
 
-GPT Repo MCP is intentionally not a shell runner.
-
 - ChatGPT works through named repository ids and repo-relative paths.
 - Mutating tools are disabled until a repo opts in.
 - File writes are checked against allow/deny policy, path sandboxing, size limits, and secret scanning.
 - Git tools operate only on explicit paths and local commits.
-- There are no tools for push, pull, reset, checkout, switch, rebase, merge, stash, force, branch deletion, shell execution, or arbitrary command execution.
+- Workspace command tools run inside approved repositories with argv/script schemas, timeouts, output caps, process-group cleanup, and network/admin command blocks.
+- `workspace_run_python` and `workspace_run_bash` are the preferred tools for quick experiments because inline code is first materialized under `scratch/agents/<agent_id>/workspace-runs/`.
+- Binary outputs such as `.onnx`, `.zip`, `.png`, `.sqlite`, `.npy`, and `.npz` should be written under scratch or another approved write location, then inspected with `workspace_file_info` or exported with `workspace_create_file_artifact`.
+- There are no tools for push, pull, reset, checkout, switch, rebase, merge, stash, force, or branch deletion.
 
 Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 
