@@ -50,6 +50,8 @@ import {
   workspaceReapProcessesHandler,
   workspaceReleaseOfficialLockHandler,
   workspaceReleaseTaskHandler,
+  workspaceRunBashHandler,
+  workspaceRunPythonHandler,
   workspaceReadFileHandler,
   workspaceReadManyHandler,
   workspaceSearchHandler,
@@ -386,6 +388,24 @@ const fullToolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.workspace_exec.output,
     annotations: writeAnnotations,
     handler: workspaceExecHandler
+  },
+  {
+    name: "workspace_run_python",
+    title: "Run workspace Python",
+    description: descriptions.workspace_run_python,
+    inputSchema: toolContracts.workspace_run_python.input,
+    outputSchema: toolContracts.workspace_run_python.output,
+    annotations: writeAnnotations,
+    handler: workspaceRunPythonHandler
+  },
+  {
+    name: "workspace_run_bash",
+    title: "Run workspace shell script",
+    description: descriptions.workspace_run_bash,
+    inputSchema: toolContracts.workspace_run_bash.input,
+    outputSchema: toolContracts.workspace_run_bash.output,
+    annotations: writeAnnotations,
+    handler: workspaceRunBashHandler
   },
   {
     name: "workspace_agent_session",

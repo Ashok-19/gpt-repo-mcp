@@ -65,6 +65,10 @@ export const descriptions = {
     "Use this when the user asks for a local-only ChatGPT handoff: skapa handoff, create handoff, skriv handoff, session handoff, resume note, fortsättningsanteckning, ny chatt context, or överlämning till nästa chatt. Creates .chatgpt/handoffs/*.local.md and updates current.local.md; never stages, commits, pushes, resets, checks out, or runs shell commands.",
   workspace_exec:
     "Use this when the user asks to run a local repository script or validation command. Runs an argv array inside an approved repository with policy checks and bounded output.",
+  workspace_run_python:
+    "Use this when the user asks to run a Python experiment or repo-local Python script. Inline code is stored in workspace scratch before running, and output is bounded.",
+  workspace_run_bash:
+    "Use this when the user asks to run a shell experiment or repo-local shell script. Inline script text is stored in workspace scratch before running, and output is bounded.",
   workspace_agent_session:
     "Use this when a ChatGPT tab or worker needs its own workspace identity and scratch directory. Returns an agent id and scratch/agents path without touching official files.",
   workspace_claim_task:

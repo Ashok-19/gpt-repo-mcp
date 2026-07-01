@@ -62,6 +62,8 @@ import type {
   WorkspacePolicyExplainInput,
   WorkspaceReapProcessesInput,
   WorkspaceReleaseTaskInput,
+  WorkspaceRunBashInput,
+  WorkspaceRunPythonInput,
   WorkspaceWriteFileInput
 } from "../contracts/workspace.contract.js";
 
@@ -429,6 +431,20 @@ export const workspaceExecHandler: ToolHandler = async (input, context) => safeT
   const result = await workspaceService(repo.root, context).exec(args);
   audit({ tool: "workspace_exec", repo_id: args.repo_id, counts: { exit_code: result.exit_code ?? -1 }, truncated: result.stdout_truncated || result.stderr_truncated });
   return createSuccessEnvelope(result, result.timed_out ? `Command timed out in ${result.duration_ms}ms.` : `Command exited with ${result.exit_code}.`);
+});
+
+export const workspaceRunPythonHandler: ToolHandler = async (input, context) => safeTool<WorkspaceRunPythonInput>("workspace_run_python", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).runPython(args);
+  audit({ tool: "workspace_run_python", repo_id: args.repo_id, paths: [result.script_path], counts: { exit_code: result.exit_code ?? -1 }, truncated: result.stdout_truncated || result.stderr_truncated, agent_id: args.agent_id, warnings: result.timed_out ? ["TIMEOUT"] : undefined });
+  return createSuccessEnvelope(result, result.timed_out ? `Python run timed out in ${result.duration_ms}ms.` : `Python exited with ${result.exit_code}.`);
+});
+
+export const workspaceRunBashHandler: ToolHandler = async (input, context) => safeTool<WorkspaceRunBashInput>("workspace_run_bash", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await workspaceService(repo.root, context).runBash(args);
+  audit({ tool: "workspace_run_bash", repo_id: args.repo_id, paths: [result.script_path], counts: { exit_code: result.exit_code ?? -1 }, truncated: result.stdout_truncated || result.stderr_truncated, agent_id: args.agent_id, warnings: result.timed_out ? ["TIMEOUT"] : undefined });
+  return createSuccessEnvelope(result, result.timed_out ? `Shell script timed out in ${result.duration_ms}ms.` : `Shell script exited with ${result.exit_code}.`);
 });
 
 export const workspaceAgentSessionHandler: ToolHandler = async (input, context) => safeTool<WorkspaceAgentSessionInput>("workspace_agent_session", input, context, async (args) => {

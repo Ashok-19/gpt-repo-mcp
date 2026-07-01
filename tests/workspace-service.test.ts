@@ -164,6 +164,34 @@ describe("WorkspaceService", () => {
     await expect(readFile(join(fixture.root, "scratch", "agents", "agent-a", "task001", "readme-moved.md"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  test("runs Python and shell experiments through scratch-backed script runners", async () => {
+    const fixture = await createRepoFixture();
+    const service = await workspace(fixture.root);
+
+    const python = await service.runPython({
+      agent_id: "agent-a",
+      cwd: ".",
+      code: "from pathlib import Path\nPath('scratch/agents/agent-a/task001').mkdir(parents=True, exist_ok=True)\nPath('scratch/agents/agent-a/task001/model.onnx').write_bytes(b'ONNX')\nprint('python-ok')\n",
+      timeout_seconds: 30,
+      reason: "Run inline Python experiment"
+    });
+    expect(python.exit_code).toBe(0);
+    expect(python.stdout).toContain("python-ok");
+    expect(python.generated_script_path).toMatch(/^scratch\/agents\/agent-a\/workspace-runs\/.+\.py$/);
+    await expect(readFile(join(fixture.root, "scratch", "agents", "agent-a", "task001", "model.onnx"))).resolves.toEqual(Buffer.from("ONNX"));
+
+    const shell = await service.runBash({
+      agent_id: "agent-a",
+      cwd: ".",
+      script: "mkdir -p scratch/agents/agent-a/task001\nprintf shell-ok > scratch/agents/agent-a/task001/out.txt\ncat scratch/agents/agent-a/task001/out.txt\n",
+      timeout_seconds: 30,
+      reason: "Run inline shell experiment"
+    });
+    expect(shell.exit_code).toBe(0);
+    expect(shell.stdout).toContain("shell-ok");
+    expect(shell.generated_script_path).toMatch(/^scratch\/agents\/agent-a\/workspace-runs\/.+\.sh$/);
+  });
+
   test("blocks sudo and network command families", async () => {
     const fixture = await createRepoFixture();
     const service = await workspace(fixture.root);

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn, execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { access, copyFile, lstat, mkdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
@@ -16,7 +16,9 @@ import type {
   WorkspaceExportFileInput,
   WorkspaceFileInfoInput,
   WorkspaceImportFileInput,
-  WorkspaceMakeDirInput
+  WorkspaceMakeDirInput,
+  WorkspaceRunBashInput,
+  WorkspaceRunPythonInput
 } from "../contracts/workspace.contract.js";
 
 const execFileAsync = promisify(execFile);
@@ -172,6 +174,66 @@ export class WorkspaceService {
         });
       });
     });
+  }
+
+  async runPython(input: Omit<WorkspaceRunPythonInput, "repo_id">) {
+    this.policy.assertReason(input.reason);
+    const prepared = await this.prepareRunnableScript({
+      agentId: input.agent_id,
+      cwd: input.cwd ?? ".",
+      inlineContent: input.code,
+      scriptPath: input.script_path,
+      extension: "py",
+      label: "python"
+    });
+    const interpreter = input.python ?? "python3";
+    const result = await this.exec({
+      agent_id: input.agent_id,
+      cwd: input.cwd ?? ".",
+      cmd: [interpreter, prepared.execPath, ...(input.args ?? [])],
+      timeout_seconds: input.timeout_seconds,
+      max_stdout_bytes: input.max_stdout_bytes,
+      max_stderr_bytes: input.max_stderr_bytes,
+      env: input.env,
+      dry_run: input.dry_run,
+      reason: input.reason
+    });
+    return {
+      ...result,
+      interpreter,
+      script_path: prepared.repoPath,
+      ...(prepared.generated ? { generated_script_path: prepared.repoPath } : {})
+    };
+  }
+
+  async runBash(input: Omit<WorkspaceRunBashInput, "repo_id">) {
+    this.policy.assertReason(input.reason);
+    const prepared = await this.prepareRunnableScript({
+      agentId: input.agent_id,
+      cwd: input.cwd ?? ".",
+      inlineContent: input.script,
+      scriptPath: input.script_path,
+      extension: "sh",
+      label: "bash"
+    });
+    const interpreter = input.shell ?? "bash";
+    const result = await this.exec({
+      agent_id: input.agent_id,
+      cwd: input.cwd ?? ".",
+      cmd: [interpreter, prepared.execPath, ...(input.args ?? [])],
+      timeout_seconds: input.timeout_seconds,
+      max_stdout_bytes: input.max_stdout_bytes,
+      max_stderr_bytes: input.max_stderr_bytes,
+      env: input.env,
+      dry_run: input.dry_run,
+      reason: input.reason
+    });
+    return {
+      ...result,
+      interpreter,
+      script_path: prepared.repoPath,
+      ...(prepared.generated ? { generated_script_path: prepared.repoPath } : {})
+    };
   }
 
   async exportFile(input: Omit<WorkspaceExportFileInput, "repo_id">) {
@@ -432,6 +494,35 @@ export class WorkspaceService {
       throw new RepoReaderError("SYMLINK_ESCAPE_REJECTED", `Path escapes approved repository: ${repoPath}`);
     }
     return join(this.root, repoPath);
+  }
+
+  private async prepareRunnableScript(input: {
+    agentId?: string;
+    cwd: string;
+    inlineContent?: string;
+    scriptPath?: string;
+    extension: "py" | "sh";
+    label: "python" | "bash";
+  }): Promise<{ repoPath: string; execPath: string; generated: boolean }> {
+    if ((input.inlineContent ? 1 : 0) + (input.scriptPath ? 1 : 0) !== 1) {
+      throw new RepoReaderError("VALIDATION_ERROR", `Provide exactly one of ${input.label === "python" ? "code" : "script"} or script_path.`);
+    }
+    if (input.scriptPath) {
+      const cwd = await this.resolveExistingDirectory(input.cwd);
+      const repoPath = await this.normalizeCommandPathArg(cwd.repoPath, input.scriptPath);
+      if (this.policy.isSecretPath(repoPath)) {
+        throw new RepoReaderError("SECRET_CANDIDATE_BLOCKED", `Secret candidate blocked: ${repoPath}`);
+      }
+      await this.sandbox.resolve(repoPath);
+      return { repoPath, execPath: input.scriptPath, generated: false };
+    }
+
+    const agentId = input.agentId ?? `auto-${randomUUID().slice(0, 8)}`;
+    const repoPath = `scratch/agents/${agentId}/workspace-runs/${Date.now()}-${randomUUID().slice(0, 8)}.${input.extension}`;
+    this.policy.assertWritePath(repoPath);
+    const absolutePath = await this.resolveWriteTarget(repoPath, true);
+    await writeFile(absolutePath, input.inlineContent ?? "", "utf8");
+    return { repoPath, execPath: absolutePath, generated: true };
   }
 
   private assertCommandAllowed(cmd: string[], depth = 0): void {

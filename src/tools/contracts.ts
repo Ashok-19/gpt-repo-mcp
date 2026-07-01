@@ -47,6 +47,9 @@ import {
   WorkspaceReapProcessesResultSchema,
   WorkspaceReleaseTaskInputSchema,
   WorkspaceReleaseTaskResultSchema,
+  WorkspaceRunBashInputSchema,
+  WorkspaceRunPythonInputSchema,
+  WorkspaceRunScriptResultSchema,
   WorkspaceReadFileInputSchema,
   WorkspaceReadManyInputSchema,
   WorkspaceWriteFileInputSchema
@@ -107,6 +110,8 @@ export type ToolName =
   | "workspace_cleanup_paths"
   | "workspace_git_status"
   | "workspace_git_diff"
+  | "workspace_run_python"
+  | "workspace_run_bash"
   | "workspace_policy_explain";
 
 export type ToolContract = {
@@ -246,6 +251,14 @@ export const toolContracts = {
   workspace_exec: {
     input: WorkspaceExecInputSchema,
     output: WorkspaceExecResultSchema
+  },
+  workspace_run_python: {
+    input: WorkspaceRunPythonInputSchema,
+    output: WorkspaceRunScriptResultSchema
+  },
+  workspace_run_bash: {
+    input: WorkspaceRunBashInputSchema,
+    output: WorkspaceRunScriptResultSchema
   },
   workspace_agent_session: {
     input: WorkspaceAgentSessionInputSchema,

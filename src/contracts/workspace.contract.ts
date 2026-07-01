@@ -5,6 +5,18 @@ import { WriteFileActionSchema } from "./write.contract.js";
 const ReasonSchema = z.string().min(1).optional();
 const StringRecordSchema = z.record(z.string(), z.string());
 const AgentIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/).optional();
+const RunScriptCommonSchema = RepoInputSchema.extend({
+  agent_id: AgentIdSchema,
+  cwd: z.string().default("."),
+  script_path: z.string().min(1).optional(),
+  args: z.array(z.string()).default([]),
+  timeout_seconds: z.number().int().positive().optional(),
+  max_stdout_bytes: z.number().int().positive().optional(),
+  max_stderr_bytes: z.number().int().positive().optional(),
+  env: StringRecordSchema.optional(),
+  dry_run: z.boolean().optional(),
+  reason: ReasonSchema
+});
 
 export const WorkspaceExecInputSchema = RepoInputSchema.extend({
   agent_id: AgentIdSchema,
@@ -30,6 +42,22 @@ export const WorkspaceExecResultSchema = z.object({
   cwd: z.string(),
   cmd: z.array(z.string()),
   dry_run: z.boolean().optional()
+});
+
+export const WorkspaceRunScriptResultSchema = WorkspaceExecResultSchema.extend({
+  interpreter: z.string(),
+  script_path: z.string(),
+  generated_script_path: z.string().optional()
+});
+
+export const WorkspaceRunPythonInputSchema = RunScriptCommonSchema.extend({
+  python: z.enum(["python", "python3", "python3.12"]).optional(),
+  code: z.string().min(1).optional()
+});
+
+export const WorkspaceRunBashInputSchema = RunScriptCommonSchema.extend({
+  shell: z.enum(["bash", "sh"]).optional(),
+  script: z.string().min(1).optional()
 });
 
 export const WorkspaceExportFileInputSchema = RepoInputSchema.extend({
@@ -277,6 +305,8 @@ export const WorkspaceReapProcessesResultSchema = z.object({
 });
 
 export type WorkspaceExecInput = z.infer<typeof WorkspaceExecInputSchema>;
+export type WorkspaceRunPythonInput = z.input<typeof WorkspaceRunPythonInputSchema>;
+export type WorkspaceRunBashInput = z.input<typeof WorkspaceRunBashInputSchema>;
 export type WorkspaceExportFileInput = z.infer<typeof WorkspaceExportFileInputSchema>;
 export type WorkspaceImportFileInput = z.infer<typeof WorkspaceImportFileInputSchema>;
 export type WorkspaceFileInfoInput = z.infer<typeof WorkspaceFileInfoInputSchema>;
