@@ -36,7 +36,7 @@ This project is not affiliated with OpenAI, ChatGPT, Anthropic, or the Model Con
 ### 1. Install
 
 ```bash
-git clone https://github.com/CAHN91/gpt-repo-mcp.git
+git clone https://github.com/Ashok-19/gpt-repo-mcp.git
 cd gpt-repo-mcp
 npm install
 npm run build
