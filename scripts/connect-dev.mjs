@@ -12,6 +12,7 @@ const BUILT_SERVER_PATH = "dist/server.js";
 const HEALTH_INTERVAL_MS = positiveIntEnv("GPT_REPO_CONNECT_HEALTH_INTERVAL_MS", 30000);
 const MCP_FAILURES_BEFORE_RESTART = positiveIntEnv("GPT_REPO_CONNECT_MCP_FAILURES_BEFORE_RESTART", 3);
 const TUNNEL_FAILURES_BEFORE_RESTART = positiveIntEnv("GPT_REPO_CONNECT_TUNNEL_FAILURES_BEFORE_RESTART", 3);
+const ACTIVE_HEALTH_RESTART = process.env.GPT_REPO_CONNECT_ACTIVE_HEALTH_RESTART === "true";
 const USE_DEV_SERVER = process.env.GPT_REPO_CONNECT_USE_DEV === "true";
 const SKIP_BUILD = process.env.GPT_REPO_CONNECT_SKIP_BUILD === "true";
 const NGROK_DOMAIN = process.env.GPT_REPO_NGROK_DOMAIN ?? process.env.NGROK_DOMAIN;
@@ -143,6 +144,9 @@ function printChatGptUrl(publicUrl) {
   );
   if (!NGROK_DOMAIN) {
     globalThis.console.log("For a stable URL across ngrok restarts, set GPT_REPO_NGROK_DOMAIN to a reserved ngrok domain before running npm run connect.");
+  }
+  if (!ACTIVE_HEALTH_RESTART) {
+    globalThis.console.log("Health monitor is passive: live MCP/ngrok processes are not restarted unless they exit.");
   }
 }
 
@@ -372,7 +376,11 @@ async function superviseOnce() {
     globalThis.console.error(`[connect] MCP health check failed (${mcpHealthFailures}/${MCP_FAILURES_BEFORE_RESTART}).`);
     if (mcpHealthFailures >= MCP_FAILURES_BEFORE_RESTART) {
       mcpHealthFailures = 0;
-      restartMcp("local /health did not respond");
+      if (ACTIVE_HEALTH_RESTART) {
+        restartMcp("local /health did not respond");
+      } else {
+        globalThis.console.error("[connect] MCP health restart skipped; process is still supervised by exit handler.");
+      }
     }
   }
 
@@ -397,7 +405,11 @@ async function superviseOnce() {
   globalThis.console.error(`[connect] ngrok tunnel check failed (${tunnelHealthFailures}/${TUNNEL_FAILURES_BEFORE_RESTART}).`);
   if (tunnelHealthFailures >= TUNNEL_FAILURES_BEFORE_RESTART) {
     tunnelHealthFailures = 0;
-    restartTunnel("no healthy ngrok tunnel to local MCP port");
+    if (ACTIVE_HEALTH_RESTART) {
+      restartTunnel("no healthy ngrok tunnel to local MCP port");
+    } else {
+      globalThis.console.error("[connect] ngrok health restart skipped; process is still supervised by exit handler.");
+    }
   }
 }
 

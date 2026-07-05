@@ -242,7 +242,7 @@ Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 | --- | --- |
 | `npm run build` | Build the MCP server and CLI. |
 | `npm run doctor` | Check config, scripts, tunnel state, port use, and git status. |
-| `npm run connect` | Build the MCP server, start the production server, supervise local health, and try to use or reuse an ngrok HTTPS tunnel. |
+| `npm run connect` | Build the MCP server, start the production server, passively monitor health, and try to use or reuse an ngrok HTTPS tunnel. |
 | `npm run connect:secure` | Start the MCP server and OpenAI Secure MCP Tunnel. |
 | `npm run mcp` | Start only the local MCP server with `config.local.json`. |
 | `npm run tunnel` | Start only an ngrok tunnel to local port `8787`. |
@@ -279,7 +279,7 @@ New to ngrok? See [Install ngrok from zero](docs/SETUP.md#install-ngrok-from-zer
 - Connector URL changed: restart `npm run connect` and update ChatGPT Developer Mode with the new printed URL.
 - Write blocked: ask ChatGPT to run `repo_policy_explain` for the repo id and path.
 - Schema mismatch: refresh ChatGPT Developer Mode and run `npm test -- tests/mcp-contract.test.ts tests/tool-contracts.test.ts`.
-- `mcp_network_error: Connection failed`: keep `npm run connect` running, confirm `curl http://127.0.0.1:8787/health` returns JSON, and check the terminal for `[mcp] exited` or `[tunnel] exited` restart messages. The connector only reuses ngrok tunnels that point to local port `8787`.
+- `mcp_network_error: Connection failed`: keep `npm run connect` running, confirm `curl http://127.0.0.1:8787/health` returns JSON, and check the terminal for `[mcp] exited` or `[tunnel] exited` restart messages. Health checks are passive by default and do not restart live MCP/ngrok processes.
 - Long sessions: prevent the laptop from sleeping, keep the `npm run connect` terminal open, and set `GPT_REPO_NGROK_DOMAIN=<reserved-ngrok-domain>` before starting if you need the public URL to survive ngrok restarts.
 - Tunnel 502: confirm the local server is running, check `/health`, then restart ngrok or try a fresh tunnel.
 

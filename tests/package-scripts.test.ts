@@ -43,7 +43,9 @@ describe("package startup scripts", () => {
     expect(script).toContain("MCP_HEALTH_URL");
     expect(script).toContain("dist/server.js");
     expect(script).toContain("GPT_REPO_CONNECT_USE_DEV");
+    expect(script).toContain("GPT_REPO_CONNECT_ACTIVE_HEALTH_RESTART");
     expect(script).toContain("GPT_REPO_NGROK_DOMAIN");
+    expect(script).toContain("Health monitor is passive");
     expect(script).toContain("waitForLocalHealth");
     expect(script).toContain("tunnelTargetsLocalMcpPort");
     expect(script).toContain("Restarting in");
