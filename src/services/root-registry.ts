@@ -39,7 +39,14 @@ export class RootRegistry {
     const parsed = ConfigSchema.parse(config);
     const repos = [];
     for (const repo of parsed.repos) {
-      repos.push({ ...repo, root: await realpath(repo.root) });
+      try {
+        repos.push({ ...repo, root: await realpath(repo.root) });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          throw error;
+        }
+        console.warn(`[config] Skipping missing repository root for ${repo.repo_id}: ${repo.root}`);
+      }
     }
     return new RootRegistry(
       repos,
