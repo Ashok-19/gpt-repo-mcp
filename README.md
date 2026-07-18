@@ -61,6 +61,15 @@ npm run add -- /path/to/your/repo --mode write
 npm run add -- /path/to/your/repo --mode ship
 ```
 
+Optional: expose the official Kaggle MCP through the same ChatGPT connector by adding your Kaggle access token to the ignored local `.env` file:
+
+```bash
+cp .env.example .env
+# Set GPT_REPO_KAGGLE_TOKEN in .env
+```
+
+ChatGPT can then discover upstream tools with `kaggle_mcp_list_tools` and invoke the selected tool with `kaggle_mcp_call_tool`.
+
 ### 3. Connect ChatGPT
 
 Create one stable public path token before your first connection:

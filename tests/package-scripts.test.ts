@@ -52,6 +52,7 @@ describe("package startup scripts", () => {
     expect(script).toContain("ChatGPT MCP URL");
     expect(script).toContain("Reusing existing ngrok tunnel");
     expect(script).toContain("readNgrokHttpsUrl");
+    expect(script).toContain("loadEnvFile");
   });
 
   test("includes secure tunnel startup script and env example", async () => {
@@ -76,6 +77,7 @@ describe("package startup scripts", () => {
     expect(envExample).toContain("GPT_REPO_CONFIG=./config.local.json");
     expect(envExample).toContain("GPT_REPO_LOG_FORMAT=pretty");
     expect(envExample).toContain("PORT=8787");
+    expect(envExample).toContain("GPT_REPO_KAGGLE_TOKEN=");
 
     const connectionOptions = await readFile(join(process.cwd(), "docs", "CONNECTION_OPTIONS.md"), "utf8");
     expect(connectionOptions).toContain("example local `tunnel-client` profile label");

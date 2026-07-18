@@ -8,6 +8,7 @@ import { GitCommitInputSchema, GitCommitResultSchema, GitRecoverInputSchema, Git
 import { GitDiffInputSchema, GitDiffResultSchema, GitStatusInputSchema, GitStatusResultSchema } from "../contracts/git.contract.js";
 import { GitReviewInputSchema, GitReviewResultSchema } from "../contracts/git-review.contract.js";
 import { HandoffInputSchema, HandoffResultSchema } from "../contracts/handoff.contract.js";
+import { KaggleCallToolInputSchema, KaggleCallToolResultSchema, KaggleListToolsInputSchema, KaggleListToolsResultSchema } from "../contracts/kaggle-mcp.contract.js";
 import { NextActionInputSchema, NextActionResultSchema } from "../contracts/next-action.contract.js";
 import { LastWriteInputSchema, LastWriteResultSchema } from "../contracts/operation-receipt.contract.js";
 import { PolicyExplainInputSchema, PolicyExplainResultSchema } from "../contracts/policy.contract.js";
@@ -59,6 +60,8 @@ import {
 } from "../contracts/workspace.contract.js";
 
 export type ToolName =
+  | "kaggle_mcp_list_tools"
+  | "kaggle_mcp_call_tool"
   | "repo_list_roots"
   | "repo_policy_explain"
   | "repo_last_write"
@@ -125,6 +128,14 @@ export type ToolContract = {
 };
 
 export const toolContracts = {
+  kaggle_mcp_list_tools: {
+    input: KaggleListToolsInputSchema,
+    output: KaggleListToolsResultSchema
+  },
+  kaggle_mcp_call_tool: {
+    input: KaggleCallToolInputSchema,
+    output: KaggleCallToolResultSchema
+  },
   repo_list_roots: {
     input: RepoInputSchema.omit({ repo_id: true }),
     output: RepoListResultSchema

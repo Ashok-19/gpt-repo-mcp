@@ -4,6 +4,14 @@ import { constants } from "node:fs";
 import { spawn } from "node:child_process";
 import process from "node:process";
 
+try {
+  process.loadEnvFile?.(".env");
+} catch (error) {
+  if (error?.code !== "ENOENT") {
+    throw error;
+  }
+}
+
 const CONFIG_PATH = "./config.local.json";
 const PORT = "8787";
 const NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels";

@@ -27,6 +27,7 @@ import { WorkspacePolicy } from "../services/workspace-policy.js";
 import { WorkspaceService } from "../services/workspace-service.js";
 import { WorkspaceAgentService } from "../services/workspace-agent-service.js";
 import { OperationReceiptService } from "../services/operation-receipt-service.js";
+import { kaggleMcpProxy } from "../services/kaggle-mcp-proxy.js";
 import { createErrorEnvelope, createSuccessEnvelope } from "../runtime/result-envelope.js";
 import { toRepoReaderError } from "../runtime/errors.js";
 import { audit } from "../runtime/telemetry.js";
@@ -47,6 +48,7 @@ import type { GitCommitInput, GitRecoverInput, GitRestorePathsInput, GitStageCom
 import type { GitReviewInput } from "../contracts/git-review.contract.js";
 import type { CleanupPathsInput } from "../contracts/cleanup.contract.js";
 import type { HandoffInput } from "../contracts/handoff.contract.js";
+import type { KaggleCallToolInput, KaggleListToolsInput } from "../contracts/kaggle-mcp.contract.js";
 import type {
   WorkspaceApplyPatchInput,
   WorkspaceAgentSessionInput,
@@ -90,6 +92,38 @@ type GitDiffInput = RepoInput & {
 };
 
 export type ToolHandler = (input: unknown, context: RuntimeContext) => Promise<CallToolResult>;
+
+export const kaggleListToolsHandler: ToolHandler = async (input) => {
+  const args = input as KaggleListToolsInput;
+  const result = await kaggleMcpProxy.listTools(args.cursor);
+  const tools = result.tools
+    .filter((tool) => !args.tool_name || tool.name === args.tool_name)
+    .map((tool) => ({
+      name: tool.name,
+      ...(tool.title ? { title: tool.title } : {}),
+      ...(tool.description ? { description: tool.description } : {}),
+      ...(args.tool_name ? { input_schema: tool.inputSchema } : {}),
+      ...(args.tool_name && tool.outputSchema ? { output_schema: tool.outputSchema } : {}),
+      ...(tool.annotations ? { annotations: tool.annotations } : {})
+    }));
+  const data = {
+    tools,
+    ...(result.nextCursor ? { next_cursor: result.nextCursor } : {})
+  };
+  return {
+    content: [{ type: "text", text: JSON.stringify(data) }],
+    structuredContent: data
+  };
+};
+
+export const kaggleCallToolHandler: ToolHandler = async (input) => {
+  const args = input as KaggleCallToolInput;
+  const result = await kaggleMcpProxy.callTool(args.tool_name, args.arguments);
+  return {
+    ...result,
+    structuredContent: result.structuredContent ?? ({} as Record<string, unknown>)
+  } as CallToolResult;
+};
 
 export const listRootsHandler: ToolHandler = async (_input, context) => {
   const repos = context.registry.list();
