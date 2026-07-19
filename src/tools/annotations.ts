@@ -11,13 +11,3 @@ export const writeAnnotations = {
   openWorldHint: false,
   idempotentHint: false
 } as const;
-
-export const kaggleReadAnnotations = {
-  ...readOnlyAnnotations,
-  openWorldHint: true
-} as const;
-
-export const kaggleWriteAnnotations = {
-  ...writeAnnotations,
-  openWorldHint: true
-} as const;

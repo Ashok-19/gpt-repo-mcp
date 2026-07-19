@@ -3,6 +3,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { RootRegistry } from "./services/root-registry.js";
+import { loadKaggleTools } from "./services/kaggle-mcp-proxy.js";
 import { createMcpServer } from "./register.js";
 import type { RuntimeContext } from "./runtime/context.js";
 import { buildMcpRoutePatterns, isAuthorizedMcpPath, sanitizeMcpRouteForAudit } from "./runtime/mcp-routes.js";
@@ -24,6 +25,7 @@ const registry = configPath
   ? await RootRegistry.fromFile(configPath)
   : await RootRegistry.fromConfig({ repos: [], limits: {} });
 const context: RuntimeContext = { registry };
+const kaggleTools = await loadKaggleTools();
 
 function logRuntimeError(event: "unhandled_rejection" | "uncaught_exception", error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
@@ -206,7 +208,7 @@ app.post(mcpRoutePatterns, async (req: Request, res: Response) => {
         transport = transports[sessionId];
       } else if (!sessionId && isInitializeRequest(req.body)) {
         transport = createTransport();
-        await createMcpServer(context).connect(transport);
+        await createMcpServer(context, kaggleTools).connect(transport);
       } else {
         res.status(400).json({
           jsonrpc: "2.0",

@@ -68,7 +68,7 @@ cp .env.example .env
 # Set GPT_REPO_KAGGLE_TOKEN in .env
 ```
 
-ChatGPT can then discover upstream tools with `kaggle_mcp_list_tools` and invoke the selected tool with `kaggle_mcp_call_tool`.
+ChatGPT then receives every upstream Kaggle tool separately with a `kaggle_` prefix, such as `kaggle_search_competitions` and `kaggle_get_dataset_info`.
 
 ### 3. Connect ChatGPT
 

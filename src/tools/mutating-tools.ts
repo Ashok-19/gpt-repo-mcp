@@ -1,7 +1,6 @@
 import type { ToolName } from "./contracts.js";
 
 export const MUTATING_TOOL_NAMES = [
-  "kaggle_mcp_call_tool",
   "repo_write_file",
   "repo_write_changes",
   "repo_write_handoff",

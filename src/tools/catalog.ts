@@ -1,5 +1,5 @@
 import { descriptions } from "./descriptions.js";
-import { kaggleReadAnnotations, kaggleWriteAnnotations, readOnlyAnnotations, writeAnnotations } from "./annotations.js";
+import { readOnlyAnnotations, writeAnnotations } from "./annotations.js";
 import { toolContracts, type ToolContract, type ToolName } from "./contracts.js";
 import {
   changePlanHandler,
@@ -13,8 +13,6 @@ import {
   gitRestorePathsHandler,
   gitStageHandler,
   gitStatusHandler,
-  kaggleCallToolHandler,
-  kaggleListToolsHandler,
   gitUnstageHandler,
   lastWriteHandler,
   listRootsHandler,
@@ -72,7 +70,7 @@ export type ToolDefinition = {
   description: string;
   inputSchema: ToolContract["input"];
   outputSchema: ToolContract["output"];
-  annotations: typeof readOnlyAnnotations | typeof writeAnnotations | typeof kaggleReadAnnotations | typeof kaggleWriteAnnotations;
+  annotations: typeof readOnlyAnnotations | typeof writeAnnotations;
   handler: ToolHandler;
 };
 
@@ -96,24 +94,6 @@ const hiddenPublicToolNames = new Set<ToolName>([
 ]);
 
 const fullToolCatalog: ToolDefinition[] = [
-  {
-    name: "kaggle_mcp_list_tools",
-    title: "List Kaggle MCP tools",
-    description: descriptions.kaggle_mcp_list_tools,
-    inputSchema: toolContracts.kaggle_mcp_list_tools.input,
-    outputSchema: toolContracts.kaggle_mcp_list_tools.output,
-    annotations: kaggleReadAnnotations,
-    handler: kaggleListToolsHandler
-  },
-  {
-    name: "kaggle_mcp_call_tool",
-    title: "Call a Kaggle MCP tool",
-    description: descriptions.kaggle_mcp_call_tool,
-    inputSchema: toolContracts.kaggle_mcp_call_tool.input,
-    outputSchema: toolContracts.kaggle_mcp_call_tool.output,
-    annotations: kaggleWriteAnnotations,
-    handler: kaggleCallToolHandler
-  },
   {
     name: "repo_list_roots",
     title: "List approved repositories",

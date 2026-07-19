@@ -5,11 +5,12 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { SERVER_INSTRUCTIONS, createMcpServer } from "../src/register.js";
 import { RootRegistry } from "../src/services/root-registry.js";
 import { toolCatalog } from "../src/tools/catalog.js";
-import { kaggleMcpProxy } from "../src/services/kaggle-mcp-proxy.js";
+import { readOnlyAnnotations, writeAnnotations } from "../src/tools/annotations.js";
+import { isMutatingToolName } from "../src/tools/mutating-tools.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -56,12 +57,15 @@ describe("MCP contract", () => {
       expect(new Set(listed.tools.map((tool) => tool.name))).toEqual(new Set(toolCatalog.map((tool) => tool.name)));
 
       for (const tool of listed.tools) {
-        const definition = toolCatalog.find((candidate) => candidate.name === tool.name);
         expect(tool.title).toEqual(expect.any(String));
         expect(tool.description).toEqual(expect.stringMatching(/^Use this when/));
         expect(tool.inputSchema).toBeDefined();
         expect(tool.outputSchema).toBeDefined();
-        expect(tool.annotations).toMatchObject(definition?.annotations ?? {});
+        if (isMutatingToolName(tool.name)) {
+          expect(tool.annotations).toMatchObject(writeAnnotations);
+        } else {
+          expect(tool.annotations).toMatchObject(readOnlyAnnotations);
+        }
       }
     } finally {
       await close();
@@ -99,41 +103,6 @@ describe("MCP contract", () => {
         outputKeys: Object.keys(tool.outputSchema?.properties ?? {}).sort()
       }))).toMatchInlineSnapshot(`
         [
-          {
-            "annotations": {
-              "destructiveHint": false,
-              "idempotentHint": true,
-              "openWorldHint": true,
-              "readOnlyHint": true,
-            },
-            "description": "Use this when the user asks to use Kaggle. Omit tool_name to list available Kaggle MCP tools, then pass an exact tool_name to inspect its full input schema before calling it.",
-            "inputKeys": [
-              "cursor",
-              "tool_name",
-            ],
-            "name": "kaggle_mcp_list_tools",
-            "outputKeys": [
-              "next_cursor",
-              "tools",
-            ],
-            "title": "List Kaggle MCP tools",
-          },
-          {
-            "annotations": {
-              "destructiveHint": true,
-              "idempotentHint": false,
-              "openWorldHint": true,
-              "readOnlyHint": false,
-            },
-            "description": "Use this when the user asks to call an exact Kaggle MCP tool after kaggle_mcp_list_tools. This can perform external or destructive Kaggle actions, so inspect the schema and obtain explicit user approval before any mutation.",
-            "inputKeys": [
-              "arguments",
-              "tool_name",
-            ],
-            "name": "kaggle_mcp_call_tool",
-            "outputKeys": [],
-            "title": "Call a Kaggle MCP tool",
-          },
           {
             "annotations": {
               "destructiveHint": false,
@@ -1641,11 +1610,6 @@ describe("MCP contract", () => {
   });
 
   test("representative calls for every exposed tool match their output schema", async () => {
-    const listTools = vi.spyOn(kaggleMcpProxy, "listTools").mockResolvedValue({ tools: [] });
-    const callTool = vi.spyOn(kaggleMcpProxy, "callTool").mockResolvedValue({
-      content: [{ type: "text", text: "Kaggle call completed." }],
-      structuredContent: { ok: true }
-    });
     const { client, close, head, root } = await connectFixtureServer();
     try {
       const calls = representativeCalls(head, root);
@@ -1666,16 +1630,12 @@ describe("MCP contract", () => {
       }
     } finally {
       await close();
-      listTools.mockRestore();
-      callTool.mockRestore();
     }
   });
 });
 
 function representativeCalls(head: string, root: string): Record<string, Record<string, unknown>> {
   return {
-  kaggle_mcp_list_tools: {},
-  kaggle_mcp_call_tool: { tool_name: "search_competitions", arguments: { request: { search: "fixture" } } },
   repo_list_roots: {},
   repo_policy_explain: { repo_id: "fixture", path: "README.md", operation: "read" },
   repo_last_write: { repo_id: "fixture" },

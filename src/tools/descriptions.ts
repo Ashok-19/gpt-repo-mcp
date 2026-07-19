@@ -1,8 +1,4 @@
 export const descriptions = {
-  kaggle_mcp_list_tools:
-    "Use this when the user asks to use Kaggle. Omit tool_name to list available Kaggle MCP tools, then pass an exact tool_name to inspect its full input schema before calling it.",
-  kaggle_mcp_call_tool:
-    "Use this when the user asks to call an exact Kaggle MCP tool after kaggle_mcp_list_tools. This can perform external or destructive Kaggle actions, so inspect the schema and obtain explicit user approval before any mutation.",
   repo_list_roots:
     "Use this when the user asks which approved repositories are available. Does not read file contents.",
   repo_policy_explain:

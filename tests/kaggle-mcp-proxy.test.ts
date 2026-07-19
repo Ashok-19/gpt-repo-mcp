@@ -1,5 +1,9 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, test, vi } from "vitest";
-import { KaggleMcpProxy } from "../src/services/kaggle-mcp-proxy.js";
+import { createMcpServer } from "../src/register.js";
+import { KaggleMcpProxy, kaggleMcpProxy, loadKaggleTools, type KaggleTool } from "../src/services/kaggle-mcp-proxy.js";
+import { RootRegistry } from "../src/services/root-registry.js";
 
 describe("KaggleMcpProxy", () => {
   test("connects once and forwards list and call requests", async () => {
@@ -20,5 +24,67 @@ describe("KaggleMcpProxy", () => {
       name: "search_competitions",
       arguments: { request: { search: "vision" } }
     });
+  });
+
+  test("registers every upstream tool as a separately callable prefixed tool", async () => {
+    const tools = [
+      {
+        name: "search_competitions",
+        description: "Search Kaggle competitions.",
+        inputSchema: { type: "object", properties: { request: { type: "object" } } },
+        annotations: { readOnlyHint: true }
+      },
+      {
+        name: "submit_to_competition",
+        description: "Submit to a Kaggle competition.",
+        inputSchema: { type: "object", properties: { request: { type: "object" } } }
+      }
+    ] as KaggleTool[];
+    const call = vi.spyOn(kaggleMcpProxy, "callTool").mockResolvedValue({
+      content: [{ type: "text", text: "ok" }]
+    });
+    const registry = await RootRegistry.fromConfig({ repos: [] });
+    const server = createMcpServer({ registry }, tools);
+    const client = new Client({ name: "kaggle-registration-test", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+      const listed = await client.listTools();
+      const search = listed.tools.find((tool) => tool.name === "kaggle_search_competitions");
+      const submit = listed.tools.find((tool) => tool.name === "kaggle_submit_to_competition");
+      expect(search?.description).toContain('"request"');
+      expect(search?.annotations).toMatchObject({ readOnlyHint: true, openWorldHint: true });
+      expect(submit?.annotations).toMatchObject({ destructiveHint: true, openWorldHint: true });
+
+      const result = await client.callTool({
+        name: "kaggle_search_competitions",
+        arguments: { request: { search: "vision" } }
+      });
+      expect(result.isError).toBeUndefined();
+      expect(call).toHaveBeenCalledWith("search_competitions", { request: { search: "vision" } });
+    } finally {
+      call.mockRestore();
+      await client.close();
+      await server.close();
+    }
+  });
+
+  test("loads every upstream tools/list page", async () => {
+    vi.stubEnv("GPT_REPO_KAGGLE_TOKEN", "test-token");
+    const list = vi.spyOn(kaggleMcpProxy, "listTools")
+      .mockResolvedValueOnce({ tools: [{ name: "first", inputSchema: { type: "object" } }], nextCursor: "page-2" })
+      .mockResolvedValueOnce({ tools: [{ name: "second", inputSchema: { type: "object" } }] });
+    try {
+      await expect(loadKaggleTools()).resolves.toEqual([
+        expect.objectContaining({ name: "first" }),
+        expect.objectContaining({ name: "second" })
+      ]);
+      expect(list).toHaveBeenNthCalledWith(1, undefined);
+      expect(list).toHaveBeenNthCalledWith(2, "page-2");
+    } finally {
+      list.mockRestore();
+      vi.unstubAllEnvs();
+    }
   });
 });

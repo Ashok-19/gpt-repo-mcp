@@ -1,8 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 
 type UpstreamClient = Pick<Client, "listTools" | "callTool">;
 type ClientFactory = () => Promise<UpstreamClient>;
+export type KaggleTool = ListToolsResult["tools"][number];
 
 export class KaggleMcpProxy {
   private client?: Promise<UpstreamClient>;
@@ -43,3 +45,22 @@ async function connectKaggleMcp(): Promise<Client> {
 }
 
 export const kaggleMcpProxy = new KaggleMcpProxy();
+
+export async function loadKaggleTools(): Promise<KaggleTool[]> {
+  if (!process.env.GPT_REPO_KAGGLE_TOKEN) {
+    return [];
+  }
+  try {
+    const tools: KaggleTool[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await kaggleMcpProxy.listTools(cursor);
+      tools.push(...page.tools);
+      cursor = page.nextCursor;
+    } while (cursor);
+    return tools;
+  } catch (error) {
+    console.warn(`[kaggle] Could not load upstream tools: ${error instanceof Error ? error.message : String(error)}`);
+    return [];
+  }
+}

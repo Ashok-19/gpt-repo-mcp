@@ -28,7 +28,7 @@ import { HandoffInputSchema, HandoffResultSchema } from "../src/contracts/handof
 import { LastWriteInputSchema, LastWriteResultSchema } from "../src/contracts/operation-receipt.contract.js";
 import { PolicyExplainInputSchema, PolicyExplainResultSchema } from "../src/contracts/policy.contract.js";
 import { RepoReaderConfigSchema } from "../src/config/schema.js";
-import { kaggleReadAnnotations, kaggleWriteAnnotations, readOnlyAnnotations, writeAnnotations } from "../src/tools/annotations.js";
+import { readOnlyAnnotations, writeAnnotations } from "../src/tools/annotations.js";
 import { toolCatalog } from "../src/tools/catalog.js";
 import { toolContracts } from "../src/tools/contracts.js";
 import { MUTATING_TOOL_NAMES, isMutatingToolName } from "../src/tools/mutating-tools.js";
@@ -48,8 +48,6 @@ function schemaDescription(schema: unknown): string | undefined {
 describe("tool catalog contracts", () => {
   test("all tools have required metadata and appropriate annotations", () => {
     expect(toolCatalog.map((tool) => tool.name)).toEqual([
-      "kaggle_mcp_list_tools",
-      "kaggle_mcp_call_tool",
       "repo_list_roots",
       "repo_policy_explain",
       "repo_last_write",
@@ -100,11 +98,7 @@ describe("tool catalog contracts", () => {
       expect(tool.description.startsWith("Use this when")).toBe(true);
       expect(tool.inputSchema).toBeDefined();
       expect(tool.outputSchema).toBeDefined();
-      if (tool.name === "kaggle_mcp_list_tools") {
-        expect(tool.annotations).toEqual(kaggleReadAnnotations);
-      } else if (tool.name === "kaggle_mcp_call_tool") {
-        expect(tool.annotations).toEqual(kaggleWriteAnnotations);
-      } else if (isMutatingToolName(tool.name)) {
+      if (isMutatingToolName(tool.name)) {
         expect(tool.annotations).toEqual(writeAnnotations);
       } else {
         expect(tool.annotations).toEqual(readOnlyAnnotations);
@@ -115,7 +109,6 @@ describe("tool catalog contracts", () => {
 
   test("mutating tools use central contracts and annotations", () => {
     expect(MUTATING_TOOL_NAMES).toEqual([
-      "kaggle_mcp_call_tool",
       "repo_write_file",
       "repo_write_changes",
       "repo_write_handoff",
@@ -753,41 +746,6 @@ describe("tool catalog contracts", () => {
       outputKeys: Object.keys(tool.outputSchema.shape).sort()
     }))).toMatchInlineSnapshot(`
       [
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": true,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks to use Kaggle. Omit tool_name to list available Kaggle MCP tools, then pass an exact tool_name to inspect its full input schema before calling it.",
-          "inputKeys": [
-            "cursor",
-            "tool_name",
-          ],
-          "name": "kaggle_mcp_list_tools",
-          "outputKeys": [
-            "next_cursor",
-            "tools",
-          ],
-          "title": "List Kaggle MCP tools",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": true,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when the user asks to call an exact Kaggle MCP tool after kaggle_mcp_list_tools. This can perform external or destructive Kaggle actions, so inspect the schema and obtain explicit user approval before any mutation.",
-          "inputKeys": [
-            "arguments",
-            "tool_name",
-          ],
-          "name": "kaggle_mcp_call_tool",
-          "outputKeys": [],
-          "title": "Call a Kaggle MCP tool",
-        },
         {
           "annotations": {
             "destructiveHint": false,
