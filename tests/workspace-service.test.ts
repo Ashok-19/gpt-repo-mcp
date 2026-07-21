@@ -54,6 +54,7 @@ describe("WorkspaceService", () => {
     expect(result.exit_code).toBe(0);
     expect(`${result.stdout}${result.stderr}`).toMatch(/Python/);
     expect(result.cwd).toBe(".");
+    expect(result.resolved_cwd).toBe(fixture.root);
   });
 
   test("runs repo-local validation script from a task directory", async () => {

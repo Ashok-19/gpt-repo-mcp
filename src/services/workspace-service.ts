@@ -92,6 +92,7 @@ export class WorkspaceService {
         stdout_truncated: false,
         stderr_truncated: false,
         cwd: cwd.repoPath,
+        resolved_cwd: cwd.absolutePath,
         cmd,
         dry_run: true
       };
@@ -106,6 +107,7 @@ export class WorkspaceService {
       stdout_truncated: boolean;
       stderr_truncated: boolean;
       cwd: string;
+      resolved_cwd: string;
       cmd: string[];
       restored_tracked_paths?: string[];
       preservation_warnings?: string[];
@@ -156,6 +158,7 @@ export class WorkspaceService {
             stdout_truncated: stdout.truncated(),
             stderr_truncated: stderr.truncated(),
             cwd: cwd.repoPath,
+            resolved_cwd: cwd.absolutePath,
             cmd,
             ...(preservation ? { restored_tracked_paths: restored, preservation_warnings: warnings } : {})
           });
