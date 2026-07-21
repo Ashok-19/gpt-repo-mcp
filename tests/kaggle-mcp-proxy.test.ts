@@ -91,7 +91,8 @@ describe("KaggleMcpProxy", () => {
     await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
     try {
       const listed = await client.listTools();
-      expect(listed.tools[0]?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+      expect(listed.tools.find((tool) => tool.name === "kaggle_download_notebook_output")?.annotations)
+        .toMatchObject({ readOnlyHint: false, destructiveHint: false });
       const result = await client.callTool({ name: "kaggle_download_notebook_output", arguments: {} });
       const artifact = (result.structuredContent as { materialized_artifact?: Record<string, unknown> }).materialized_artifact;
       localPath = artifact?.local_path as string;
@@ -106,6 +107,30 @@ describe("KaggleMcpProxy", () => {
       if (localPath) await rm(localPath, { force: true });
       call.mockRestore();
       vi.unstubAllGlobals();
+      await client.close();
+      await server.close();
+    }
+  });
+
+  test("omits notebook source blobs from info responses", async () => {
+    const tools = [{ name: "get_notebook_info", inputSchema: { type: "object" } }] as KaggleTool[];
+    const upstream = { title: "Saved notebook", version: 1, source: "print('large source')", nested: { cells: ["large"] } };
+    const call = vi.spyOn(kaggleMcpProxy, "callTool").mockResolvedValue({
+      content: [{ type: "text", text: JSON.stringify(upstream) }],
+      structuredContent: upstream
+    });
+    const registry = await RootRegistry.fromConfig({ repos: [] });
+    const server = createMcpServer({ registry }, tools);
+    const client = new Client({ name: "kaggle-info-test", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+      const result = await client.callTool({ name: "kaggle_get_notebook_info", arguments: {} });
+      expect(result.structuredContent).toEqual({ title: "Saved notebook", version: 1, nested: {} });
+      expect(JSON.stringify(result.content)).not.toContain("large source");
+    } finally {
+      call.mockRestore();
       await client.close();
       await server.close();
     }

@@ -10,6 +10,7 @@ import { kaggleMcpProxy, type KaggleTool } from "../services/kaggle-mcp-proxy.js
 const KaggleArgumentsSchema = z.object({}).passthrough();
 const MUTATING_KAGGLE_TOOL = /^(cancel|create|save|start|submit|update|upload)_/;
 const DOWNLOAD_TOOLS = new Set(["download_notebook_output", "download_notebook_output_zip"]);
+const SAVED_NOTEBOOK_TOOLS = new Set(["get_notebook_info", "list_notebook_files", ...DOWNLOAD_TOOLS]);
 const MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024;
 
 export function registerKaggleTools(server: McpServer, tools: KaggleTool[]): void {
@@ -20,7 +21,7 @@ export function registerKaggleTools(server: McpServer, tools: KaggleTool[]): voi
       `kaggle_${tool.name}`,
       {
         title: tool.title ?? `Kaggle: ${tool.name.replaceAll("_", " ")}`,
-        description: `${tool.description ?? `Call Kaggle's ${tool.name} tool.`}\n\nInput schema: ${JSON.stringify(tool.inputSchema)}`,
+        description: `${tool.description ?? `Call Kaggle's ${tool.name} tool.`}${SAVED_NOTEBOOK_TOOLS.has(tool.name) ? " Saved versions use numeric version identifiers; omit version-label fields unless Kaggle returned a valid label." : ""}\n\nInput schema: ${JSON.stringify(tool.inputSchema)}`,
         inputSchema: KaggleArgumentsSchema,
         annotations: {
           ...tool.annotations,
@@ -32,10 +33,34 @@ export function registerKaggleTools(server: McpServer, tools: KaggleTool[]): voi
       },
       async (args) => {
         const result = await kaggleMcpProxy.callTool(tool.name, args) as CallToolResult;
-        return DOWNLOAD_TOOLS.has(tool.name) ? await materializeDownload(result, tool.name) : result;
+        if (DOWNLOAD_TOOLS.has(tool.name)) return await materializeDownload(result, tool.name);
+        return tool.name === "get_notebook_info" ? compactNotebookInfo(result) : result;
       }
     );
   }
+}
+
+function compactNotebookInfo(result: CallToolResult): CallToolResult {
+  return {
+    ...result,
+    content: result.content.map((block) => {
+      if (block.type !== "text") return block;
+      try {
+        return { ...block, text: JSON.stringify(withoutNotebookSource(JSON.parse(block.text))) };
+      } catch {
+        return block;
+      }
+    }),
+    ...(result.structuredContent ? { structuredContent: withoutNotebookSource(result.structuredContent) as Record<string, unknown> } : {})
+  };
+}
+
+function withoutNotebookSource(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutNotebookSource);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !/^(cells|code|kernel_source|notebook_source|script|source)$/i.test(key))
+    .map(([key, item]) => [key, withoutNotebookSource(item)]));
 }
 
 async function materializeDownload(result: CallToolResult, toolName: string): Promise<CallToolResult> {
