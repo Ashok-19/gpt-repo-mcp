@@ -70,7 +70,7 @@ cp .env.example .env
 # Set GPT_REPO_KAGGLE_TOKEN in .env
 ```
 
-ChatGPT receives four read-only saved-notebook tools by default: notebook info, file listing, selected-output download, and output-ZIP download. Notebook info omits source/code blobs, and descriptions distinguish numeric saved versions from optional version labels. Download tools materialize trusted Kaggle signed URLs under the system temporary directory and return the remote URL, local path, byte count, and SHA-256. When a selected-output signed URL returns 404, the server uses the official `kaggle kernels output` command as a latest-output fallback and reports that retrieval mode explicitly. Failures include stable stage, notebook, version, file, HTTP, and redacted upstream diagnostics. Set `GPT_REPO_KAGGLE_TOOLS` to a comma-separated upstream allowlist, or `*` only when the full Kaggle surface is genuinely needed.
+ChatGPT receives every tool published by the official Kaggle MCP. Set `GPT_REPO_KAGGLE_TOOLS` only to restrict that surface to a comma-separated allowlist. Notebook info omits source/code blobs, and descriptions distinguish numeric saved versions from optional version labels. Download tools materialize trusted Kaggle signed URLs under the system temporary directory and return the remote URL, local path, byte count, and SHA-256. When a selected-output signed URL returns 404, the server downloads the output bundle with the official `kaggle kernels output` command, resolves the requested path locally, and reports that retrieval mode explicitly. Failures include stable stage, notebook, version, file, HTTP, and redacted upstream diagnostics.
 
 ### 3. Connect ChatGPT
 

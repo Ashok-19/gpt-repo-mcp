@@ -92,15 +92,14 @@ them. The public-surface snapshot prevents accidental re-exposure.
 
 ## Kaggle proxy
 
-The default proxy allowlist exposes only saved-output review operations:
-`get_notebook_info`, `list_notebook_files`, `download_notebook_output`, and
-`download_notebook_output_zip`. It does not expose notebook create, update, run, or
-submission operations. The two download operations materialize trusted signed URLs
-to a bounded temporary file and add its local path, byte count, and SHA-256 to the
-result. A selected-file 404 falls back to the official read-only Kaggle CLI output
-download and returns stable diagnostics if retrieval still fails.
-`tests/kaggle-mcp-proxy.test.ts` verifies default filtering, materialization,
-explicit allowlists, full opt-in, schema forwarding, and error forwarding. Live
+The proxy exposes every tool returned by the official Kaggle MCP. The exact count is
+dynamic and is reported by `/health`; `GPT_REPO_KAGGLE_TOOLS` can restrict the
+surface to an explicit comma-separated allowlist. Download operations materialize
+trusted signed URLs to a bounded temporary file and add its local path, byte count,
+and SHA-256 to the result. A selected-file 404 falls back to an official Kaggle CLI
+output-bundle download, resolves the requested path locally, and returns stable
+diagnostics if retrieval still fails. `tests/kaggle-mcp-proxy.test.ts` verifies full
+default exposure, explicit allowlists, materialization, schema forwarding, and error forwarding. Live
 Kaggle identity and download behavior require the configured external connector and
 are intentionally part of the new-session acceptance prompt.
 
