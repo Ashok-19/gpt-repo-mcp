@@ -7,7 +7,8 @@ import type { KaggleTool } from "./services/kaggle-mcp-proxy.js";
 import { registerKaggleTools } from "./tools/register-kaggle-tools.js";
 
 export { SERVER_INSTRUCTIONS };
-export const SERVER_VERSION = "0.2.0";
+export const SERVER_VERSION = "0.2.1";
+export const TOOL_SCHEMA_REVISION = "2";
 
 export function createMcpServer(context: RuntimeContext, kaggleTools: KaggleTool[] = []): McpServer {
   const server = new McpServer(

@@ -9,8 +9,9 @@ acceptance test, not an implementation task.
 
 Rules
 
-- Before opening the new chat, restart Local MCP and refresh or recreate the ChatGPT
-  connector so it fetches server version 0.2.0 schemas. A new chat alone may retain
+- Before opening the new chat, restart Local MCP, completely remove the old ChatGPT
+  connector, and add it again using the new `/s/2/` URL printed by `npm run connect`.
+  Confirm the server reports version 0.2.1. Browser/chat refreshes do not invalidate
   connector-cached schemas.
 - Use Local MCP tools directly. Do not use shell or Python workarounds for a tool
   failure.

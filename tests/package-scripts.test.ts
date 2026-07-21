@@ -37,7 +37,7 @@ describe("package startup scripts", () => {
     expect(script).toContain("randomBytes(16)");
     expect(script).toContain("GPT_REPO_PUBLIC_PATH_TOKEN");
     expect(script).toContain("REPO_READER_PUBLIC_PATH_TOKEN");
-    expect(script).toContain("/t/${publicPathToken}/mcp");
+    expect(script).toContain("/s/${TOOL_SCHEMA_REVISION}/t/${publicPathToken}/mcp");
     expect(script).toContain("This is guess-resistance only, not authentication");
     expect(script).toContain("127.0.0.1:4040/api/tunnels");
     expect(script).toContain("MCP_HEALTH_URL");

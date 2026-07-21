@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { RootRegistry } from "./services/root-registry.js";
 import { loadKaggleTools } from "./services/kaggle-mcp-proxy.js";
-import { createMcpServer, SERVER_VERSION } from "./register.js";
+import { createMcpServer, SERVER_VERSION, TOOL_SCHEMA_REVISION } from "./register.js";
 import { toolCatalog } from "./tools/catalog.js";
 import type { RuntimeContext } from "./runtime/context.js";
 import { buildMcpRoutePatterns, isAuthorizedMcpPath, sanitizeMcpRouteForAudit } from "./runtime/mcp-routes.js";
@@ -73,12 +73,25 @@ app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
 const transports: Record<string, StreamableHTTPServerTransport> = {};
 const mcpRoutePatterns = buildMcpRoutePatterns(publicPathToken);
 
+app.all(publicPathToken ? "/t/:publicPathToken/mcp" : "/mcp", (req, res) => {
+  const retiredToken = (req.params as Record<string, string>).publicPathToken;
+  if (publicPathToken && retiredToken !== publicPathToken) {
+    res.status(404).send("Not found");
+    return;
+  }
+  res.status(410).json({
+    error: "MCP_SCHEMA_ROUTE_RETIRED",
+    message: `Remove the cached ChatGPT connector and add it again with the /s/${TOOL_SCHEMA_REVISION}/ MCP URL printed by npm run connect.`
+  });
+});
+
 app.get("/health", (_req, res) => {
   const memory = process.memoryUsage();
   res.json({
     ok: true,
     name: "gpt-repo-mcp",
     version: SERVER_VERSION,
+    schema_revision: TOOL_SCHEMA_REVISION,
     core_tool_count: toolCatalog.length,
     kaggle_tool_count: kaggleTools.length,
     uptime_seconds: Math.floor(process.uptime()),
@@ -177,7 +190,7 @@ function attachMcpRequestAuditing(res: Response, context: RequestTelemetryContex
 }
 
 function rejectUnauthorizedMcpPath(req: Request, res: Response): boolean {
-  if (isAuthorizedMcpPath(req.path, publicPathToken)) {
+  if (isAuthorizedMcpPath(req.path, publicPathToken, TOOL_SCHEMA_REVISION)) {
     return false;
   }
   res.status(404).send("Not found");

@@ -18,7 +18,7 @@ describe("MCP contract", () => {
   test("initialize exposes server instructions and tool capability", async () => {
     const { client, close } = await connectFixtureServer();
     try {
-      expect(client.getServerVersion()).toMatchObject({ name: "gpt-repo-mcp", version: "0.2.0" });
+      expect(client.getServerVersion()).toMatchObject({ name: "gpt-repo-mcp", version: "0.2.1" });
       expect(client.getServerCapabilities()).toMatchObject({ tools: { listChanged: true } });
       expect(client.getInstructions()).toBe(SERVER_INSTRUCTIONS);
       expect(SERVER_INSTRUCTIONS).not.toContain("read-only repository app");

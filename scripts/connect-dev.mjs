@@ -14,6 +14,7 @@ try {
 
 const CONFIG_PATH = "./config.local.json";
 const PORT = "8787";
+const TOOL_SCHEMA_REVISION = "2";
 const NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels";
 const MCP_HEALTH_URL = `http://127.0.0.1:${PORT}/health`;
 const BUILT_SERVER_PATH = "dist/server.js";
@@ -146,7 +147,7 @@ function sleep(ms) {
 function printChatGptUrl(publicUrl) {
   lastAnnouncedPublicUrl = publicUrl;
   const normalized = publicUrl.replace(/\/$/, "");
-  globalThis.console.log(`ChatGPT MCP URL: ${normalized}/t/${publicPathToken}/mcp`);
+  globalThis.console.log(`ChatGPT MCP URL: ${normalized}/s/${TOOL_SCHEMA_REVISION}/t/${publicPathToken}/mcp`);
   globalThis.console.log("After an MCP upgrade, refresh or recreate the ChatGPT connector before opening a new chat; ChatGPT may otherwise retain old tool schemas.");
   globalThis.console.log(
     "This is guess-resistance only, not authentication. Anyone with the full URL can reach the endpoint while the tunnel is running. Stop with Ctrl+C when done."
@@ -233,7 +234,7 @@ async function announceNgrokUrl() {
   }
 
   globalThis.console.log(
-    `Could not auto-detect ngrok URL. Open http://127.0.0.1:4040 or look for the HTTPS forwarding URL in [tunnel] output and append /t/${publicPathToken}/mcp.`
+    `Could not auto-detect ngrok URL. Open http://127.0.0.1:4040 or look for the HTTPS forwarding URL in [tunnel] output and append /s/${TOOL_SCHEMA_REVISION}/t/${publicPathToken}/mcp.`
   );
 }
 
@@ -423,7 +424,7 @@ async function superviseOnce() {
 }
 
 async function startProcesses() {
-  globalThis.console.log("Use the HTTPS ngrok URL with the printed /t/<token>/mcp path in ChatGPT Developer Mode.");
+  globalThis.console.log("Use the HTTPS ngrok URL with the printed /s/<schema>/t/<token>/mcp path in ChatGPT Developer Mode.");
 
   await ensureBuiltServerReady();
   startMcpProcess();

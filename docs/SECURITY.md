@@ -22,7 +22,7 @@ Codex task tools do not run Codex or execute commands. `repo_prepare_codex_task`
 
 ## Transport
 
-The default OSS connection path is `npm run connect`. It starts the local MCP server and starts or reuses ngrok as a built-in convenience HTTPS tunnel. The printed ChatGPT URL ends in `/t/<random-token>/mcp`. See [CONNECTION_OPTIONS.md](CONNECTION_OPTIONS.md) for built-in, manual, and Secure MCP Tunnel connection paths.
+The default OSS connection path is `npm run connect`. It starts the local MCP server and starts or reuses ngrok as a built-in convenience HTTPS tunnel. The printed ChatGPT URL uses `/s/<schema>/t/<random-token>/mcp`; the schema segment prevents an upgraded server from reusing an old connector cache key. See [CONNECTION_OPTIONS.md](CONNECTION_OPTIONS.md) for connection paths.
 
 That random path token is guess-resistance only, not authentication. Anyone with the full URL can reach the MCP endpoint while the public tunnel is running, so treat it as a temporary local development endpoint and stop it when done.
 

@@ -86,7 +86,7 @@ echo "$GPT_REPO_PUBLIC_PATH_TOKEN"
 The token is used in the public MCP URL path:
 
 ```text
-/t/<GPT_REPO_PUBLIC_PATH_TOKEN>/mcp
+/s/2/t/<GPT_REPO_PUBLIC_PATH_TOKEN>/mcp
 ```
 
 It is guess-resistance for your ngrok URL path, not full authentication. Anyone with the complete printed URL can reach the MCP endpoint while the tunnel is running. Stop `npm run connect` with `Ctrl+C` when you are done.
@@ -102,7 +102,7 @@ npm run connect
 Copy the printed URL:
 
 ```text
-ChatGPT MCP URL: https://<ngrok-host>/t/<random-token>/mcp
+ChatGPT MCP URL: https://<ngrok-host>/s/2/t/<random-token>/mcp
 ```
 
 Paste it into ChatGPT Developer Mode connector settings, start a new chat, select the connector, and ask:

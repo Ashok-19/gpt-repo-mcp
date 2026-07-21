@@ -22,7 +22,7 @@ For copy-paste install commands for macOS, Debian/Ubuntu Linux, and Windows, see
 Use `npm run connect` first for local OSS setup. It starts the local MCP server, starts or reuses ngrok as a convenience HTTPS tunnel, and prints a URL like:
 
 ```text
-ChatGPT MCP URL: https://<ngrok-host>/t/<random-token>/mcp
+ChatGPT MCP URL: https://<ngrok-host>/s/2/t/<random-token>/mcp
 ```
 
 Paste the exact printed URL into ChatGPT Developer Mode connector settings.
@@ -44,7 +44,7 @@ Cloudflare Tunnel example: `cloudflared tunnel --url http://localhost:8787`.
 Use this ChatGPT connector URL shape:
 
 ```text
-https://<public-host>/t/<that-token>/mcp
+https://<public-host>/s/2/t/<that-token>/mcp
 ```
 
 If you only need the local MCP server without a tunnel, run `npm run mcp`. It starts only the local server on localhost. It does not create a public path token or start a tunnel.
@@ -77,15 +77,15 @@ In ChatGPT connector settings, choose Tunnel as the connection type and select o
 ## Security Notes
 
 - Public tunnel URLs are reachable by anyone who has the full URL while the tunnel is running.
-- The random `/t/<token>/mcp` path is guess-resistance only, not authentication.
+- The random token path is guess-resistance only, not authentication. The preceding `/s/<schema>/` segment is a connector-cache revision.
 - Repository policy still applies: ChatGPT supplies `repo_id`, approved roots are enforced, path sandboxing and secret checks remain active, and mutating tools stay disabled unless the repo explicitly opts in.
 - Stop temporary public tunnels when done.
 - Do not commit `.env`, `config.local.json`, tunnel runtime API keys, or local tunnel profiles.
 
 ## Troubleshooting
 
-- Connector cannot connect after `npm run connect`: confirm the command is still running and paste the exact current `/t/<random-token>/mcp` URL.
-- URL is rejected: confirm it starts with `https://` and includes `/t/<token>/mcp`.
+- Connector cannot connect after `npm run connect`: confirm the command is still running and paste the exact current versioned URL.
+- URL is rejected: confirm it starts with `https://` and matches the URL printed by `npm run connect`.
 - Manual tunnel returns 404: confirm the server was started with `GPT_REPO_PUBLIC_PATH_TOKEN` and the connector URL uses the same token.
 - Secure Tunnel connector cannot discover tools: keep `npm run connect:secure` running and refresh connector metadata in ChatGPT.
 - Local MCP is unreachable: run `curl http://127.0.0.1:8787/health` while the local server is running.
