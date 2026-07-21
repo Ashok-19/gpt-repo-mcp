@@ -484,6 +484,7 @@ describe("WorkspaceService", () => {
 
     expect(result.dry_run).toBe(true);
     expect(result.deleted).toEqual([{ path: "scratch/delete-me.txt", type: "file" }]);
+    expect(result).toMatchObject({ selected_files: 1, selected_bytes: 10, deleted_files: 0, deleted_bytes: 0 });
     await expect(readFile(join(fixture.root, "scratch", "delete-me.txt"), "utf8")).resolves.toBe("temporary\n");
   });
 
@@ -499,6 +500,7 @@ describe("WorkspaceService", () => {
     });
 
     expect(result.deleted).toEqual([{ path: "scratch/run1/tmp.txt", type: "file" }]);
+    expect(result).toMatchObject({ selected_files: 1, selected_bytes: 10, deleted_files: 1, deleted_bytes: 10 });
     await expect(readFile(join(fixture.root, "scratch", "run1", "tmp.txt"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 

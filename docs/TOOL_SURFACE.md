@@ -386,7 +386,7 @@ Example:
 }
 ```
 
-Tracked files are refused even if they match `cleanup_allowed_globs`; use normal write/review workflows for tracked public files.
+Tracked files are refused even if they match `cleanup_allowed_globs`; use normal write/review workflows for tracked public files. Results report `selected_files`, `selected_bytes`, `deleted_files`, and `deleted_bytes`, so dry-run and actual cleanup cannot be confused.
 
 ### `repo_project_brief`
 

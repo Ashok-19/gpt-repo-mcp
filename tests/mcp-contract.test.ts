@@ -1332,8 +1332,12 @@ describe("MCP contract", () => {
             "name": "workspace_cleanup_paths",
             "outputKeys": [
               "deleted",
+              "deleted_bytes",
+              "deleted_files",
               "dry_run",
               "ok",
+              "selected_bytes",
+              "selected_files",
               "skipped",
               "warnings",
             ],

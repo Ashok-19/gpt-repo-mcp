@@ -18,6 +18,10 @@ export const CleanupPathsResultSchema = z.object({
     path: z.string().describe("Repo-relative path that was not deleted."),
     reason: z.string().describe("Stable reason explaining why the path was skipped.")
   })).describe("Explicit paths that were not deleted and the reason for each skip."),
+  selected_files: z.number().int().nonnegative().describe("Number of untracked files selected by this request."),
+  selected_bytes: z.number().int().nonnegative().describe("Exact bytes selected by this request, including during dry-run."),
+  deleted_files: z.number().int().nonnegative().describe("Number of files physically deleted; zero during dry-run."),
+  deleted_bytes: z.number().int().nonnegative().describe("Exact bytes physically deleted; zero during dry-run."),
   warnings: z.array(z.string()).describe("Non-fatal warnings produced by the cleanup service.")
 });
 

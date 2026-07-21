@@ -221,6 +221,10 @@ export const WorkspaceDeletePathsResultSchema = z.object({
     path: z.string(),
     reason: z.string()
   })),
+  selected_files: z.number().int().nonnegative(),
+  selected_bytes: z.number().int().nonnegative(),
+  deleted_files: z.number().int().nonnegative(),
+  deleted_bytes: z.number().int().nonnegative(),
   warnings: z.array(z.string()).default([])
 });
 

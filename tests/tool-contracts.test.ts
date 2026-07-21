@@ -577,9 +577,14 @@ describe("tool catalog contracts", () => {
         ".chatgpt/audits/**",
         ".chatgpt/backlog/**",
         ".chatgpt/codex-runs/**",
-        "coverage/**",
-        "dist/**",
-        "test-results/**"
+        "scratch/**",
+        "**/.pytest_cache/**",
+        "**/.ruff_cache/**",
+        "**/__pycache__/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/test-results/**",
+        "**/playwright-report/**"
       ]
     });
     expect(RepoReaderConfigSchema.parse({
@@ -597,9 +602,14 @@ describe("tool catalog contracts", () => {
         ".chatgpt/audits/**",
         ".chatgpt/backlog/**",
         ".chatgpt/codex-runs/**",
-        "coverage/**",
-        "dist/**",
-        "test-results/**"
+        "scratch/**",
+        "**/.pytest_cache/**",
+        "**/.ruff_cache/**",
+        "**/__pycache__/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/test-results/**",
+        "**/playwright-report/**"
       ]
     });
   });
@@ -1975,8 +1985,12 @@ describe("tool catalog contracts", () => {
           "name": "workspace_cleanup_paths",
           "outputKeys": [
             "deleted",
+            "deleted_bytes",
+            "deleted_files",
             "dry_run",
             "ok",
+            "selected_bytes",
+            "selected_files",
             "skipped",
             "warnings",
           ],

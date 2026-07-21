@@ -24,6 +24,10 @@ describe("CleanupService", () => {
       dry_run: true,
       deleted: [{ path: ".chatgpt/tool-tests/result.txt", type: "file" }],
       skipped: [],
+      selected_files: 1,
+      selected_bytes: 10,
+      deleted_files: 0,
+      deleted_bytes: 0,
       warnings: []
     });
     await expect(readFile(join(fixture.root, ".chatgpt", "tool-tests", "result.txt"), "utf8")).resolves.toBe("temporary\n");
@@ -38,6 +42,7 @@ describe("CleanupService", () => {
     });
 
     expect(result.deleted).toEqual([{ path: ".chatgpt/tool-tests/result.txt", type: "file" }]);
+    expect(result).toMatchObject({ selected_files: 1, selected_bytes: 10, deleted_files: 1, deleted_bytes: 10 });
     await expect(access(join(fixture.root, ".chatgpt", "tool-tests", "result.txt"))).rejects.toMatchObject({
       code: "ENOENT"
     });
@@ -52,6 +57,7 @@ describe("CleanupService", () => {
     });
 
     expect(result.deleted).toEqual([{ path: ".chatgpt/tool-tests", type: "directory" }]);
+    expect(result).toMatchObject({ selected_files: 2, selected_bytes: 20, deleted_files: 2, deleted_bytes: 20 });
     await expect(access(join(fixture.root, ".chatgpt", "tool-tests"))).rejects.toMatchObject({
       code: "ENOENT"
     });

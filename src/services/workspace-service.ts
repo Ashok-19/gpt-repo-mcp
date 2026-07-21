@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { spawn, execFile } from "node:child_process";
 import { constants } from "node:fs";
-import { access, copyFile, lstat, mkdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { access, copyFile, lstat, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
@@ -403,6 +403,8 @@ export class WorkspaceService {
     const dryRun = input.dry_run ?? true;
     const deleted: Array<{ path: string; type: "file" | "directory" }> = [];
     const skipped: Array<{ path: string; reason: string }> = [];
+    let selectedFiles = 0;
+    let selectedBytes = 0;
     for (const path of input.paths) {
       let repoPath: string;
       try {
@@ -429,6 +431,9 @@ export class WorkspaceService {
           skipped.push({ path: repoPath, reason: "CLEANUP_TRACKED_PATH" });
           continue;
         }
+        const totals = await pathTotals(resolved.absolutePath);
+        selectedFiles += totals.fileCount;
+        selectedBytes += totals.sizeBytes;
         deleted.push({ path: repoPath, type: resolved.stat.isDirectory() ? "directory" : "file" });
         if (!dryRun) {
           await rm(resolved.absolutePath, { recursive: resolved.stat.isDirectory() });
@@ -437,7 +442,17 @@ export class WorkspaceService {
         skipped.push({ path: repoPath, reason: toRepoReaderError(error).code });
       }
     }
-    return { ok: true as const, dry_run: dryRun, deleted, skipped, warnings: [] };
+    return {
+      ok: true as const,
+      dry_run: dryRun,
+      deleted,
+      skipped,
+      selected_files: selectedFiles,
+      selected_bytes: selectedBytes,
+      deleted_files: dryRun ? 0 : selectedFiles,
+      deleted_bytes: dryRun ? 0 : selectedBytes,
+      warnings: []
+    };
   }
 
   async applyPatch(input: Omit<WorkspaceApplyPatchInput, "repo_id">) {
@@ -1002,6 +1017,19 @@ async function exists(path: string): Promise<boolean> {
     if (isNotFoundError(error)) return false;
     throw error;
   }
+}
+
+async function pathTotals(path: string): Promise<{ fileCount: number; sizeBytes: number }> {
+  const entry = await lstat(path);
+  if (!entry.isDirectory()) return { fileCount: 1, sizeBytes: entry.size };
+  let fileCount = 0;
+  let sizeBytes = 0;
+  for (const child of await readdir(path)) {
+    const totals = await pathTotals(join(path, child));
+    fileCount += totals.fileCount;
+    sizeBytes += totals.sizeBytes;
+  }
+  return { fileCount, sizeBytes };
 }
 
 function isNotFoundError(error: unknown): boolean {

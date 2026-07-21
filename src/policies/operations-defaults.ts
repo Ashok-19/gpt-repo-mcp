@@ -10,8 +10,13 @@ export const DEFAULT_OPERATIONS_POLICY = {
     ".chatgpt/audits/**",
     ".chatgpt/backlog/**",
     ".chatgpt/codex-runs/**",
-    "coverage/**",
-    "dist/**",
-    "test-results/**"
+    "scratch/**",
+    "**/.pytest_cache/**",
+    "**/.ruff_cache/**",
+    "**/__pycache__/**",
+    "**/coverage/**",
+    "**/dist/**",
+    "**/test-results/**",
+    "**/playwright-report/**"
   ]
 };

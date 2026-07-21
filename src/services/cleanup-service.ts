@@ -19,6 +19,8 @@ type CleanupTarget = {
   path: string;
   absolutePath: string;
   type: "file" | "directory";
+  fileCount: number;
+  sizeBytes: number;
 };
 
 export class CleanupService {
@@ -31,6 +33,8 @@ export class CleanupService {
     const matcher = ignore().add(this.policy.config.cleanup_allowed_globs);
     const targets = await Promise.all(input.paths.map((path) => this.resolveTarget(path, matcher)));
     const existingTargets = targets.filter((target): target is CleanupTarget => target !== undefined);
+    const selectedFiles = existingTargets.reduce((total, target) => total + target.fileCount, 0);
+    const selectedBytes = existingTargets.reduce((total, target) => total + target.sizeBytes, 0);
 
     if (!input.dry_run) {
       for (const target of existingTargets) {
@@ -43,6 +47,10 @@ export class CleanupService {
       dry_run: input.dry_run ?? false,
       deleted: existingTargets.map((target) => ({ path: target.path, type: target.type })),
       skipped: targets.flatMap((target, index) => target ? [] : [{ path: input.paths[index] ?? "", reason: "NOT_FOUND" }]),
+      selected_files: selectedFiles,
+      selected_bytes: selectedBytes,
+      deleted_files: input.dry_run ? 0 : selectedFiles,
+      deleted_bytes: input.dry_run ? 0 : selectedBytes,
       warnings: []
     };
   }
@@ -67,10 +75,10 @@ export class CleanupService {
     await this.assertUntracked(repoPath);
 
     if (stat.isDirectory()) {
-      await this.assertDirectorySafe(repoPath, absolutePath);
-      return { path: repoPath, absolutePath, type: "directory" };
+      const totals = await this.inspectDirectory(repoPath, absolutePath);
+      return { path: repoPath, absolutePath, type: "directory", ...totals };
     }
-    return { path: repoPath, absolutePath, type: "file" };
+    return { path: repoPath, absolutePath, type: "file", fileCount: 1, sizeBytes: stat.size };
   }
 
   private validateCleanupPath(path: string, matcher: ReturnType<typeof ignore>): string {
@@ -97,8 +105,10 @@ export class CleanupService {
     return repoPath;
   }
 
-  private async assertDirectorySafe(repoPath: string, absolutePath: string): Promise<void> {
+  private async inspectDirectory(repoPath: string, absolutePath: string): Promise<{ fileCount: number; sizeBytes: number }> {
     const entries = await readdir(absolutePath, { withFileTypes: true });
+    let fileCount = 0;
+    let sizeBytes = 0;
     for (const entry of entries) {
       const childRepoPath = `${repoPath}/${entry.name}`;
       const childAbsolutePath = join(absolutePath, entry.name);
@@ -108,9 +118,15 @@ export class CleanupService {
       }
       await assertWithinRoot(this.root, childAbsolutePath);
       if (stat.isDirectory()) {
-        await this.assertDirectorySafe(childRepoPath, childAbsolutePath);
+        const child = await this.inspectDirectory(childRepoPath, childAbsolutePath);
+        fileCount += child.fileCount;
+        sizeBytes += child.sizeBytes;
+      } else {
+        fileCount += 1;
+        sizeBytes += stat.size;
       }
     }
+    return { fileCount, sizeBytes };
   }
 
   private async assertUntracked(repoPath: string): Promise<void> {
