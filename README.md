@@ -279,6 +279,7 @@ New to ngrok? See [Install ngrok from zero](docs/SETUP.md#install-ngrok-from-zer
 - [ChatGPT connector steps](docs/CHATGPT_CONNECT.md)
 - [Connection options](docs/CONNECTION_OPTIONS.md)
 - [Tool surface](docs/TOOL_SURFACE.md)
+- [Per-tool audit](docs/TOOL_AUDIT.md)
 - [Write workflows](docs/WRITE_WORKFLOWS.md)
 - [Security model](docs/SECURITY.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)
