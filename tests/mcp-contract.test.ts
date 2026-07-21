@@ -30,7 +30,7 @@ describe("MCP contract", () => {
       expect(SERVER_INSTRUCTIONS).toContain("repo_write_stage_commit for reviewed happy-path local commits");
       expect(SERVER_INSTRUCTIONS).toContain("repo_write_recover for reviewed recovery");
       expect(SERVER_INSTRUCTIONS).toContain("Dry-run is optional preview");
-      expect(SERVER_INSTRUCTIONS).toContain("Omit optional reason by default");
+      expect(SERVER_INSTRUCTIONS).toContain("workspace_exec and workspace_run_script require a short reason");
       expect(SERVER_INSTRUCTIONS).toContain("repo_last_write");
       expect(SERVER_INSTRUCTIONS).not.toContain("dry-run first when possible");
       expect(SERVER_INSTRUCTIONS).toContain("does not push");
@@ -87,6 +87,19 @@ describe("MCP contract", () => {
       expect(names.has("workspace_run_bash")).toBe(false);
       expect(names.has("workspace_export_file")).toBe(false);
       expect(names.has("workspace_delete_paths")).toBe(false);
+    } finally {
+      await close();
+    }
+  });
+
+  test("execution schemas visibly require a reason", async () => {
+    const { client, close } = await connectFixtureServer();
+    try {
+      const listed = await client.listTools();
+      for (const name of ["workspace_exec", "workspace_run_script"]) {
+        const tool = listed.tools.find((candidate) => candidate.name === name);
+        expect(tool?.inputSchema.required).toContain("reason");
+      }
     } finally {
       await close();
     }

@@ -3,6 +3,7 @@ import { RepoInputSchema } from "./repo.contract.js";
 import { WriteFileActionSchema } from "./write.contract.js";
 
 const ReasonSchema = z.string().min(1).optional();
+const RequiredExecutionReasonSchema = z.string().min(1).describe("Short audit reason for running the command or script.");
 const StringRecordSchema = z.record(z.string(), z.string());
 const AgentIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/).optional();
 const RunScriptCommonSchema = RepoInputSchema.extend({
@@ -16,7 +17,7 @@ const RunScriptCommonSchema = RepoInputSchema.extend({
   env: StringRecordSchema.optional(),
   preserve_tracked_worktree: z.boolean().optional().describe("Restore tracked files that were clean before the command but changed during it."),
   dry_run: z.boolean().optional(),
-  reason: ReasonSchema
+  reason: RequiredExecutionReasonSchema
 });
 
 export const WorkspaceExecInputSchema = RepoInputSchema.extend({
@@ -29,7 +30,7 @@ export const WorkspaceExecInputSchema = RepoInputSchema.extend({
   env: StringRecordSchema.optional(),
   preserve_tracked_worktree: z.boolean().optional().describe("Restore tracked files that were clean before the command but changed during it."),
   dry_run: z.boolean().optional(),
-  reason: ReasonSchema
+  reason: RequiredExecutionReasonSchema
 });
 
 export const WorkspaceExecResultSchema = z.object({

@@ -12,7 +12,7 @@ export const SERVER_INSTRUCTIONS = [
   "For repo-local experiments, use workspace_run_script with runtime py, posix, or node. Use workspace_save_file for direct UTF-8, base64, or hex file creation, including binary artifacts. Use workspace_exec for direct argv commands when no snippet is needed.",
   "After repo_git_review, prefer composite workflow tools when payloads are available: use repo_write_stage_commit for reviewed happy-path local commits and repo_write_recover for reviewed recovery, cleanup, unstage, or restore.",
   "Dry-run is optional preview, not a required ritual. Use dry_run when the user asks for preview, risk is unclear, testing a new tool, or the state is unusual. For review-provided actual composite payloads with explicit user approval, call the actual composite tool directly.",
-  "Omit optional reason by default to reduce payload friction. Use reason only when it adds meaningful audit context, keep it short, and if a client blocks a mutating call, retry without optional reason before changing the workflow.",
+  "workspace_exec and workspace_run_script require a short reason. Omit reason for other tools unless it adds meaningful audit context.",
   "For continuity after an interruption or new turn, repo_last_write can show the latest write receipt; repo_git_review consumes that provenance automatically and returns current commit or recovery payloads.",
   "repo_write_recover is explicit path-only and can unstage, restore worktree paths, and clean configured artifacts; it does not reset, checkout, stash, clean, commit, push, or run shell commands.",
   "For code drilldown, use repo_tree for structure, repo_search for locating relevant code, repo_fetch_file for specific files, and repo_read_many only for bounded known sets.",
