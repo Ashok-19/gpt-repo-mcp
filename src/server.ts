@@ -4,7 +4,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { RootRegistry } from "./services/root-registry.js";
 import { loadKaggleTools } from "./services/kaggle-mcp-proxy.js";
-import { createMcpServer } from "./register.js";
+import { createMcpServer, SERVER_VERSION } from "./register.js";
+import { toolCatalog } from "./tools/catalog.js";
 import type { RuntimeContext } from "./runtime/context.js";
 import { buildMcpRoutePatterns, isAuthorizedMcpPath, sanitizeMcpRouteForAudit } from "./runtime/mcp-routes.js";
 import {
@@ -77,6 +78,9 @@ app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     name: "gpt-repo-mcp",
+    version: SERVER_VERSION,
+    core_tool_count: toolCatalog.length,
+    kaggle_tool_count: kaggleTools.length,
     uptime_seconds: Math.floor(process.uptime()),
     sessions: Object.keys(transports).length,
     rss_mb: Math.round(memory.rss / 1024 / 1024)

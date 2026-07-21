@@ -9,6 +9,9 @@ acceptance test, not an implementation task.
 
 Rules
 
+- Before opening the new chat, restart Local MCP and refresh or recreate the ChatGPT
+  connector so it fetches server version 0.2.0 schemas. A new chat alone may retain
+  connector-cached schemas.
 - Use Local MCP tools directly. Do not use shell or Python workarounds for a tool
   failure.
 - Do not repeatedly rediscover schemas. Use the schemas already supplied by the

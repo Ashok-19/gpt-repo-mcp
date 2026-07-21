@@ -147,6 +147,7 @@ function printChatGptUrl(publicUrl) {
   lastAnnouncedPublicUrl = publicUrl;
   const normalized = publicUrl.replace(/\/$/, "");
   globalThis.console.log(`ChatGPT MCP URL: ${normalized}/t/${publicPathToken}/mcp`);
+  globalThis.console.log("After an MCP upgrade, refresh or recreate the ChatGPT connector before opening a new chat; ChatGPT may otherwise retain old tool schemas.");
   globalThis.console.log(
     "This is guess-resistance only, not authentication. Anyone with the full URL can reach the endpoint while the tunnel is running. Stop with Ctrl+C when done."
   );

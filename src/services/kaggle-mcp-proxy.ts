@@ -41,7 +41,7 @@ async function connectKaggleMcp(): Promise<Client> {
     throw new Error("Kaggle MCP is not configured. Set GPT_REPO_KAGGLE_TOKEN in .env and restart npm run connect.");
   }
 
-  const client = new Client({ name: "gpt-repo-kaggle-bridge", version: "0.1.1" });
+  const client = new Client({ name: "gpt-repo-kaggle-bridge", version: "0.2.0" });
   const transport = new StreamableHTTPClientTransport(
     new URL(process.env.GPT_REPO_KAGGLE_MCP_URL ?? "https://www.kaggle.com/mcp"),
     { requestInit: { headers: { Authorization: `Bearer ${token}` } } }

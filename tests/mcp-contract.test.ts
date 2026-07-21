@@ -18,8 +18,8 @@ describe("MCP contract", () => {
   test("initialize exposes server instructions and tool capability", async () => {
     const { client, close } = await connectFixtureServer();
     try {
-      expect(client.getServerVersion()).toMatchObject({ name: "gpt-repo-mcp", version: "0.1.1" });
-      expect(client.getServerCapabilities()).toMatchObject({ tools: {} });
+      expect(client.getServerVersion()).toMatchObject({ name: "gpt-repo-mcp", version: "0.2.0" });
+      expect(client.getServerCapabilities()).toMatchObject({ tools: { listChanged: true } });
       expect(client.getInstructions()).toBe(SERVER_INSTRUCTIONS);
       expect(SERVER_INSTRUCTIONS).not.toContain("read-only repository app");
       expect(SERVER_INSTRUCTIONS).toContain("Mutating tools are disabled by default and require repo-local config opt-in");
@@ -48,6 +48,8 @@ describe("MCP contract", () => {
     expect(serverSource).toContain("Parse error: invalid JSON request body");
     expect(serverSource).toContain("unhandledRejection");
     expect(serverSource).toContain("rss_mb");
+    expect(serverSource).toContain("core_tool_count: toolCatalog.length");
+    expect(serverSource).toContain("kaggle_tool_count: kaggleTools.length");
   });
 
   test("tools/list exposes schemas and appropriate annotations for every tool", async () => {
