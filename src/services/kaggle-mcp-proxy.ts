@@ -5,12 +5,6 @@ import type { ListToolsResult } from "@modelcontextprotocol/sdk/types.js";
 type UpstreamClient = Pick<Client, "listTools" | "callTool">;
 type ClientFactory = () => Promise<UpstreamClient>;
 export type KaggleTool = ListToolsResult["tools"][number];
-const DEFAULT_KAGGLE_TOOLS = new Set([
-  "get_notebook_info",
-  "list_notebook_files",
-  "download_notebook_output",
-  "download_notebook_output_zip"
-]);
 
 export class KaggleMcpProxy {
   private client?: Promise<UpstreamClient>;
@@ -65,8 +59,8 @@ export async function loadKaggleTools(): Promise<KaggleTool[]> {
       cursor = page.nextCursor;
     } while (cursor);
     const configured = process.env.GPT_REPO_KAGGLE_TOOLS?.split(",").map((name) => name.trim()).filter(Boolean);
-    if (configured?.includes("*")) return tools;
-    const allowed = new Set(configured?.length ? configured : DEFAULT_KAGGLE_TOOLS);
+    if (!configured?.length || configured.includes("*")) return tools;
+    const allowed = new Set(configured);
     return tools.filter((tool) => allowed.has(tool.name));
   } catch (error) {
     console.warn(`[kaggle] Could not load upstream tools: ${error instanceof Error ? error.message : String(error)}`);

@@ -188,7 +188,7 @@ describe("KaggleMcpProxy", () => {
     }
   });
 
-  test("exposes only saved-notebook review tools by default", async () => {
+  test("exposes every upstream tool by default", async () => {
     vi.stubEnv("GPT_REPO_KAGGLE_TOKEN", "test-token");
     vi.stubEnv("GPT_REPO_KAGGLE_TOOLS", "");
     const list = vi.spyOn(kaggleMcpProxy, "listTools").mockResolvedValue({ tools: [
@@ -198,17 +198,19 @@ describe("KaggleMcpProxy", () => {
       { name: "submit_to_competition", inputSchema: { type: "object" } }
     ] });
     try {
-      await expect(loadKaggleTools()).resolves.toEqual([
+      await expect(loadKaggleTools()).resolves.toEqual(expect.arrayContaining([
         expect.objectContaining({ name: "get_notebook_info" }),
-        expect.objectContaining({ name: "download_notebook_output_zip" })
-      ]);
+        expect.objectContaining({ name: "download_notebook_output_zip" }),
+        expect.objectContaining({ name: "search_competitions" }),
+        expect.objectContaining({ name: "submit_to_competition" })
+      ]));
     } finally {
       list.mockRestore();
       vi.unstubAllEnvs();
     }
   });
 
-  test("supports an explicit all-tools opt-in", async () => {
+  test("supports an explicit all-tools setting", async () => {
     vi.stubEnv("GPT_REPO_KAGGLE_TOKEN", "test-token");
     vi.stubEnv("GPT_REPO_KAGGLE_TOOLS", "*");
     const tools = [
