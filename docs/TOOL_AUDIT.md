@@ -95,7 +95,9 @@ them. The public-surface snapshot prevents accidental re-exposure.
 The default proxy allowlist exposes only saved-output review operations:
 `get_notebook_info`, `list_notebook_files`, `download_notebook_output`, and
 `download_notebook_output_zip`. It does not expose notebook create, update, run, or
-submission operations. `tests/kaggle-mcp-proxy.test.ts` verifies default filtering,
+submission operations. The two download operations materialize trusted signed URLs
+to a bounded temporary file and add its local path, byte count, and SHA-256 to the
+result. `tests/kaggle-mcp-proxy.test.ts` verifies default filtering, materialization,
 explicit allowlists, full opt-in, schema forwarding, and error forwarding. Live
 Kaggle identity and download behavior require the configured external connector and
 are intentionally part of the new-session acceptance prompt.

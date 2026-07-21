@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { readFile, rm } from "node:fs/promises";
 import { describe, expect, test, vi } from "vitest";
 import { createMcpServer } from "../src/register.js";
 import { KaggleMcpProxy, kaggleMcpProxy, loadKaggleTools, type KaggleTool } from "../src/services/kaggle-mcp-proxy.js";
@@ -65,6 +66,46 @@ describe("KaggleMcpProxy", () => {
       expect(call).toHaveBeenCalledWith("search_competitions", { request: { search: "vision" } });
     } finally {
       call.mockRestore();
+      await client.close();
+      await server.close();
+    }
+  });
+
+  test("materializes signed saved-output downloads with size and hash", async () => {
+    const tools = [{
+      name: "download_notebook_output",
+      inputSchema: { type: "object" },
+      annotations: { readOnlyHint: true }
+    }] as KaggleTool[];
+    const remoteUrl = "https://www.kaggleusercontent.com/output/model.json";
+    const call = vi.spyOn(kaggleMcpProxy, "callTool").mockResolvedValue({
+      content: [{ type: "text", text: JSON.stringify({ download_url: remoteUrl }) }]
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("artifact")));
+    const registry = await RootRegistry.fromConfig({ repos: [] });
+    const server = createMcpServer({ registry }, tools);
+    const client = new Client({ name: "kaggle-download-test", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    let localPath: string | undefined;
+
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+      const listed = await client.listTools();
+      expect(listed.tools[0]?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+      const result = await client.callTool({ name: "kaggle_download_notebook_output", arguments: {} });
+      const artifact = (result.structuredContent as { materialized_artifact?: Record<string, unknown> }).materialized_artifact;
+      localPath = artifact?.local_path as string;
+      expect(artifact).toMatchObject({
+        remote_artifact_url: remoteUrl,
+        size_bytes: 8,
+        sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        local_path: expect.stringContaining("gpt-repo-mcp/kaggle/")
+      });
+      expect(await readFile(localPath, "utf8")).toBe("artifact");
+    } finally {
+      if (localPath) await rm(localPath, { force: true });
+      call.mockRestore();
+      vi.unstubAllGlobals();
       await client.close();
       await server.close();
     }
