@@ -1,8 +1,12 @@
 import ignore from "ignore";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { extname, join } from "node:path";
 import type { GitReviewInput, GitReviewResult } from "../contracts/git-review.contract.js";
 import { IgnoreEngine } from "./ignore-engine.js";
 import { GitService } from "./git-service.js";
 import { OperationsPolicy } from "./operations-policy.js";
+import { OperationReceiptService } from "./operation-receipt-service.js";
 
 type StatusFile = GitReviewResult["changed_paths"][number];
 
@@ -35,9 +39,14 @@ export class GitReviewService {
       staged: file.index !== " " && file.index !== "?",
       unstaged: file.worktree !== " " || file.index === "?"
     }));
+    const reviewableUntracked = await this.reviewableUntrackedPaths(input.repo_id, changedPaths);
+    const untrackedSummaries = await Promise.all(changedPaths
+      .filter((path) => path.status === "untracked" && reviewableUntracked.has(path.path))
+      .map((path) => this.summarizeNewFile(path.path)));
 
-    const maxFiles = input.max_files ?? diff.files.length;
-    const diffSummaryTruncated = diff.truncated || diff.files.length > maxFiles;
+    const totalDiffFiles = diff.files.length + untrackedSummaries.length;
+    const maxFiles = input.max_files ?? totalDiffFiles;
+    const diffSummaryTruncated = diff.truncated || totalDiffFiles > maxFiles;
     const warnings = [...diff.warnings];
     if (diffSummaryTruncated) {
       warnings.push("DIFF_SUMMARY_TRUNCATED");
@@ -49,7 +58,7 @@ export class GitReviewService {
     const excludedPaths: Array<{ path: string; reason: string }> = [];
     const recommendedStagePaths: string[] = [];
     for (const path of changedPaths) {
-      const exclusion = this.exclusionReason(path);
+      const exclusion = this.exclusionReason(path, reviewableUntracked);
       if (exclusion) {
         excludedPaths.push({ path: path.path, reason: exclusion });
         continue;
@@ -63,10 +72,10 @@ export class GitReviewService {
     }
 
     const stagedPaths = changedPaths
-      .filter((path) => path.staged && !this.exclusionReason(path))
+      .filter((path) => path.staged && !this.exclusionReason(path, reviewableUntracked))
       .map((path) => path.path)
       .sort();
-    const hasStagedExcludedPaths = changedPaths.some((path) => path.staged && this.exclusionReason(path));
+    const hasStagedExcludedPaths = changedPaths.some((path) => path.staged && this.exclusionReason(path, reviewableUntracked));
     const stagedRecoveryPaths = changedPaths
       .filter((path) => path.staged && this.isRecoverableWorktreePath(path))
       .map((path) => path.path)
@@ -198,14 +207,17 @@ export class GitReviewService {
       clean: status.clean,
       changed_paths: changedPaths,
       diff_summary: {
-        file_count: diff.files.length,
+        file_count: totalDiffFiles,
         truncated: diffSummaryTruncated,
-        files: diff.files.slice(0, maxFiles).map((file) => ({
-          path: file.path,
-          status: file.status,
-          hunk_count: file.hunks.length,
-          summary: summarizeDiffFile(file.path, file.status, file.hunks.length)
-        }))
+        files: [
+          ...diff.files.map((file) => ({
+            path: file.path,
+            status: file.status,
+            hunk_count: file.hunks.length,
+            summary: summarizeDiffFile(file.path, file.status, file.hunks.length)
+          })),
+          ...untrackedSummaries
+        ].slice(0, maxFiles)
       },
       recommendation: {
         ready_to_stage: stagePaths.length > 0,
@@ -220,9 +232,9 @@ export class GitReviewService {
     };
   }
 
-  private exclusionReason(path: StatusFile): string | undefined {
-    if (isLocalCodexArtifactPath(path.path)) {
-      return "LOCAL_CODEX_ARTIFACT_EXCLUDED";
+  private exclusionReason(path: StatusFile, reviewableUntracked = new Set<string>()): string | undefined {
+    if (isLocalChatArtifactPath(path.path)) {
+      return "LOCAL_CHATGPT_ARTIFACT_EXCLUDED";
     }
     if (this.ignoreEngine.isSensitiveCandidate(path.path)) {
       return "SECRET_CANDIDATE_REQUIRES_MANUAL_REVIEW";
@@ -230,7 +242,7 @@ export class GitReviewService {
     if (isGeneratedPath(path.path)) {
       return "GENERATED_PATH_EXCLUDED";
     }
-    if (path.status === "untracked") {
+    if (path.status === "untracked" && !reviewableUntracked.has(path.path)) {
       return "UNTRACKED_REQUIRES_EXPLICIT_REVIEW";
     }
     if (path.status === "deleted") {
@@ -240,6 +252,38 @@ export class GitReviewService {
       return "RENAMED_PATH_REQUIRES_EXPLICIT_REVIEW";
     }
     return undefined;
+  }
+
+  private async reviewableUntrackedPaths(repoId: string, paths: StatusFile[]): Promise<Set<string>> {
+    const result = await new OperationReceiptService(this.root).readLastWrite(repoId);
+    const receipt = result.receipt;
+    if (!receipt?.content_hashes) return new Set();
+    const created = new Set(receipt.created_paths);
+    const trusted = new Set<string>();
+    await Promise.all(paths.filter((path) => path.status === "untracked" && created.has(path.path)).map(async (path) => {
+      try {
+        const content = await readFile(join(this.root, path.path));
+        if (createHash("sha256").update(content).digest("hex") === receipt.content_hashes?.[path.path]) {
+          trusted.add(path.path);
+        }
+      } catch {
+        // A missing or unreadable file is not reviewable.
+      }
+    }));
+    return trusted;
+  }
+
+  private async summarizeNewFile(path: string) {
+    const content = await readFile(join(this.root, path));
+    const lines = content.toString("utf8").split(/\r?\n/).length;
+    const language = extname(path).slice(1) || "text";
+    const hash = createHash("sha256").update(content).digest("hex");
+    return {
+      path,
+      status: "added",
+      hunk_count: 1,
+      summary: `New ${language} file, ${lines} lines, sha256 ${hash.slice(0, 12)}.`
+    };
   }
 
   private isCleanupEligible(path: string): boolean {
@@ -284,8 +328,8 @@ function isGeneratedPath(path: string): boolean {
   return /^(dist|coverage|test-results|node_modules)\//.test(path);
 }
 
-function isLocalCodexArtifactPath(path: string): boolean {
-  return path.startsWith(".chatgpt/codex-runs/");
+function isLocalChatArtifactPath(path: string): boolean {
+  return path.startsWith(".chatgpt/");
 }
 
 type GitDiff = Awaited<ReturnType<GitService["diff"]>>;

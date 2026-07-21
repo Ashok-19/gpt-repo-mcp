@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +9,7 @@ import { CleanupService } from "../src/services/cleanup-service.js";
 import { GitOperationsService } from "../src/services/git-operations-service.js";
 import { GitReviewService } from "../src/services/git-review-service.js";
 import { OperationsPolicy } from "../src/services/operations-policy.js";
+import { OperationReceiptService } from "../src/services/operation-receipt-service.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -187,7 +189,7 @@ describe("GitReviewService", () => {
 
     expect(result.recommendation.excluded_paths).toContainEqual({
       path: resultPath,
-      reason: "LOCAL_CODEX_ARTIFACT_EXCLUDED"
+      reason: "LOCAL_CHATGPT_ARTIFACT_EXCLUDED"
     });
     expect(result.recommendation.recommended_stage_paths).not.toContain(resultPath);
     expect(result.next_tool_payloads.repo_write_stage_dry_run?.paths ?? []).not.toContain(resultPath);
@@ -293,6 +295,62 @@ describe("GitReviewService", () => {
     expect(result.next_tool_payloads).toEqual({});
   });
 
+  test("includes hash-matched MCP-created files in normal review", async () => {
+    const fixture = await createGitFixture();
+    const path = "docs/new.md";
+    const content = "# New\n\nReviewed content.\n";
+    await writeFile(join(fixture.root, path), content);
+    await new OperationReceiptService(fixture.root).writeLastWrite({
+      tool: "repo_write_file",
+      repo_id: "fixture",
+      touched_paths: [path],
+      changed_paths: [path],
+      created_paths: [path],
+      modified_paths: [],
+      content_hashes: { [path]: createHash("sha256").update(content).digest("hex") },
+      counts: { requested: 1, changed: 1, created: 1, unchanged: 0 },
+      summary: "Wrote docs/new.md."
+    });
+
+    const result = await new GitReviewService(fixture.root).review({ repo_id: "fixture" });
+
+    expect(result.recommendation.recommended_stage_paths).toEqual([path]);
+    expect(result.recommendation.excluded_paths).toEqual([
+      { path: ".chatgpt/operations/last-write.json", reason: "LOCAL_CHATGPT_ARTIFACT_EXCLUDED" }
+    ]);
+    expect(result.recommendation.warnings).not.toContain("UNTRACKED_PATHS_EXCLUDED");
+    expect(result.diff_summary).toMatchObject({
+      file_count: 1,
+      files: [{ path, status: "added", hunk_count: 1, summary: expect.stringContaining("sha256") }]
+    });
+    expect(result.next_tool_payloads.repo_write_stage_commit_actual?.paths).toEqual([path]);
+  });
+
+  test("excludes an MCP-created file when its recorded hash no longer matches", async () => {
+    const fixture = await createGitFixture();
+    const path = "docs/new.md";
+    await writeFile(join(fixture.root, path), "original\n");
+    await new OperationReceiptService(fixture.root).writeLastWrite({
+      tool: "repo_write_file",
+      repo_id: "fixture",
+      touched_paths: [path],
+      changed_paths: [path],
+      created_paths: [path],
+      modified_paths: [],
+      content_hashes: { [path]: createHash("sha256").update("original\n").digest("hex") },
+      counts: { requested: 1, changed: 1, created: 1, unchanged: 0 },
+      summary: "Wrote docs/new.md."
+    });
+    await writeFile(join(fixture.root, path), "changed later\n");
+
+    const result = await new GitReviewService(fixture.root).review({ repo_id: "fixture" });
+
+    expect(result.recommendation.excluded_paths).toEqual([
+      { path: ".chatgpt/operations/last-write.json", reason: "LOCAL_CHATGPT_ARTIFACT_EXCLUDED" },
+      { path, reason: "UNTRACKED_REQUIRES_EXPLICIT_REVIEW" }
+    ]);
+  });
+
   test("cleanup-eligible untracked generated files produce cleanup payloads", async () => {
     const fixture = await createGitFixture();
     await mkdir(join(fixture.root, "coverage"), { recursive: true });
@@ -356,7 +414,7 @@ describe("GitReviewService", () => {
 
     expect(result.recommendation.excluded_paths).toContainEqual({
       path: resultPath,
-      reason: "LOCAL_CODEX_ARTIFACT_EXCLUDED"
+      reason: "LOCAL_CHATGPT_ARTIFACT_EXCLUDED"
     });
     expect(result.recommendation.recommended_stage_paths).not.toContain(resultPath);
     expect(result.next_tool_payloads.repo_cleanup_paths_dry_run).toEqual({

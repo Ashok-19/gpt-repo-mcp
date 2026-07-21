@@ -25,6 +25,7 @@ export const OperationReceiptSchema = z.object({
   changed_paths: z.array(z.string()).describe("Repo-relative paths whose content changed."),
   created_paths: z.array(z.string()).describe("Repo-relative paths created by the write operation."),
   modified_paths: z.array(z.string()).describe("Repo-relative existing paths modified by the write operation."),
+  content_hashes: z.record(z.string(), z.string()).optional().describe("SHA-256 hashes recorded for changed paths after the write."),
   counts: ReceiptCountsSchema.describe("Safe aggregate write operation counts."),
   summary: z.string().describe("Safe content-free summary of the write operation.")
 });

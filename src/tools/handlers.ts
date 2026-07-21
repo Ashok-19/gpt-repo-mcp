@@ -356,6 +356,7 @@ export const writeFileHandler: ToolHandler = async (input, context) => safeTool<
       changed_paths: [result.path],
       created_paths: result.created ? [result.path] : [],
       modified_paths: result.created ? [] : [result.path],
+      ...(result.new_sha256 ? { content_hashes: { [result.path]: result.new_sha256 } } : {}),
       counts: {
         requested: 1,
         changed: 1,
@@ -392,6 +393,9 @@ export const writeChangesHandler: ToolHandler = async (input, context) => safeTo
       changed_paths: result.changed_paths,
       created_paths: result.files.filter((file) => file.changed && file.created).map((file) => file.path),
       modified_paths: result.files.filter((file) => file.changed && !file.created).map((file) => file.path),
+      content_hashes: Object.fromEntries(result.files
+        .filter((file) => file.changed && file.new_sha256)
+        .map((file) => [file.path, file.new_sha256!])),
       counts: result.counts,
       summary: result.summary
     });

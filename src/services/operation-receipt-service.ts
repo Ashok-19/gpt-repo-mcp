@@ -78,7 +78,8 @@ function sanitizeWriteInput(input: WriteLastWriteInput): WriteLastWriteInput {
     touched_paths: uniqueSafePaths(input.touched_paths),
     changed_paths: uniqueSafePaths(input.changed_paths),
     created_paths: uniqueSafePaths(input.created_paths),
-    modified_paths: uniqueSafePaths(input.modified_paths)
+    modified_paths: uniqueSafePaths(input.modified_paths),
+    ...(input.content_hashes ? { content_hashes: safeContentHashes(input.content_hashes) } : {})
   };
 }
 
@@ -87,12 +88,17 @@ function isSafeReceipt(receipt: OperationReceipt): boolean {
     ...receipt.touched_paths,
     ...receipt.changed_paths,
     ...receipt.created_paths,
-    ...receipt.modified_paths
+    ...receipt.modified_paths,
+    ...Object.keys(receipt.content_hashes ?? {})
   ];
   return (
     paths.every(isSafeRepoPath)
     && redactSensitiveText(receipt.summary) === receipt.summary
   );
+}
+
+function safeContentHashes(hashes: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(hashes).filter(([path, hash]) => isSafeRepoPath(path) && /^[0-9a-f]{64}$/i.test(hash)));
 }
 
 function uniqueSafePaths(paths: string[]): string[] {
