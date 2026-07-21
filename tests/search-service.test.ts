@@ -37,12 +37,13 @@ describe("SearchService", () => {
     await mkdir(join(fixture.root, "runs"), { recursive: true });
     await writeFile(join(fixture.root, "runs", "old.txt"), "needle\n");
     await writeFile(join(fixture.root, "large.csv"), `needle,${"x".repeat(128_000)}\n`);
+    await writeFile(join(fixture.root, "large.txt"), `needle ${"y".repeat(128_000)}\n`);
 
     const result = await new SearchService(fixture.root, new PathSandbox(fixture.root)).search({ query: "needle" });
 
     expect(result.returned_count).toBe(0);
     expect(result.warnings).toEqual([
-      expect.stringMatching(/^Skipped large file large\.csv \(\d+ bytes; limit 128000\)\.$/)
+      expect.stringMatching(/^Skipped 2 oversized files \(\d+ bytes total; per-file limit 128000\)\. Examples: large\.csv, large\.txt\.$/)
     ]);
   });
 

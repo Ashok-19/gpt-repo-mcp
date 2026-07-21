@@ -43,6 +43,7 @@ export class SearchService {
     const warnings: string[] = tree.truncated
       ? ["Search source tree was truncated; narrow include_globs or use repo_tree continuation before searching."]
       : [];
+    const largeFiles: Array<{ path: string; size: number }> = [];
 
     for (const entry of tree.entries) {
       if (entry.type !== "file") {
@@ -57,7 +58,7 @@ export class SearchService {
       const resolved = await this.sandbox.resolve(entry.path);
       const size = entry.size_bytes ?? 0;
       if (size > DEFAULT_LIMITS.max_bytes_per_file) {
-        warnings.push(`Skipped large file ${entry.path} (${size} bytes; limit ${DEFAULT_LIMITS.max_bytes_per_file}).`);
+        largeFiles.push({ path: entry.path, size });
         continue;
       }
       const classification = await this.classifier.classify(entry.path, resolved.absolutePath);
@@ -82,6 +83,11 @@ export class SearchService {
       });
     }
 
+    if (largeFiles.length > 0) {
+      const totalBytes = largeFiles.reduce((total, file) => total + file.size, 0);
+      const examples = largeFiles.slice(0, 5).map((file) => file.path).join(", ");
+      warnings.push(`Skipped ${largeFiles.length} oversized files (${totalBytes} bytes total; per-file limit ${DEFAULT_LIMITS.max_bytes_per_file}). Examples: ${examples}.`);
+    }
     matches.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line || a.column - b.column);
     const results = matches.slice(start, start + maxResults);
     const nextIndex = start + results.length;
