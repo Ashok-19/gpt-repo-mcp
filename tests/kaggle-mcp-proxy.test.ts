@@ -92,7 +92,7 @@ describe("KaggleMcpProxy", () => {
     try {
       const listed = await client.listTools();
       expect(listed.tools.find((tool) => tool.name === "kaggle_download_notebook_output")?.annotations)
-        .toMatchObject({ readOnlyHint: false, destructiveHint: false });
+        .toMatchObject({ readOnlyHint: true, destructiveHint: false });
       const result = await client.callTool({ name: "kaggle_download_notebook_output", arguments: {} });
       const artifact = (result.structuredContent as { materialized_artifact?: Record<string, unknown> }).materialized_artifact;
       localPath = artifact?.local_path as string;
@@ -105,6 +105,39 @@ describe("KaggleMcpProxy", () => {
       expect(await readFile(localPath, "utf8")).toBe("artifact");
     } finally {
       if (localPath) await rm(localPath, { force: true });
+      call.mockRestore();
+      vi.unstubAllGlobals();
+      await client.close();
+      await server.close();
+    }
+  });
+
+  test("returns stable diagnostics when a signed URL is missing and fallback inputs are incomplete", async () => {
+    const tools = [{ name: "download_notebook_output", inputSchema: { type: "object" } }] as KaggleTool[];
+    const remoteUrl = "https://www.kaggleusercontent.com/output/missing.json";
+    const call = vi.spyOn(kaggleMcpProxy, "callTool").mockResolvedValue({
+      content: [{ type: "text", text: JSON.stringify({ download_url: remoteUrl }) }]
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("missing", { status: 404 })));
+    const registry = await RootRegistry.fromConfig({ repos: [] });
+    const server = createMcpServer({ registry }, tools);
+    const client = new Client({ name: "kaggle-download-error-test", version: "1.0.0" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+      const result = await client.callTool({
+        name: "kaggle_download_notebook_output",
+        arguments: { request: { owner: "owner", slug: "notebook", version: 1 } }
+      });
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        error: {
+          code: "KAGGLE_ARTIFACT_FALLBACK_INPUT_MISSING",
+          diagnostics: { stage: "cli_fallback", owner: "owner", slug: "notebook", version: 1, http_status: 404 }
+        }
+      });
+    } finally {
       call.mockRestore();
       vi.unstubAllGlobals();
       await client.close();

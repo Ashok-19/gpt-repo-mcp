@@ -73,3 +73,5 @@ All tool errors return:
 ## Non-Envelope Skip Reasons
 
 Some successful tools also return stable warning or skip reason strings inside their existing success output shapes. For example, `repo_read_many.skipped[].reason` may contain file policy codes such as `SECRET_CANDIDATE_BLOCKED`, `BINARY_FILE_REJECTED`, or the read-many limit reason `MAX_TOTAL_BYTES_EXCEEDED`.
+
+Kaggle saved-output download errors use stable `KAGGLE_ARTIFACT_*` codes in their dynamic tool result. Diagnostics identify `url_resolution`, `artifact_fetch`, `cli_fallback`, or `upstream_tool`; include requested owner, slug, version, and file when supplied; and redact signed URLs and token-like values.
