@@ -173,16 +173,15 @@ Codex is done. Review the Codex result and the git diff for <repo_id>.
 | --- | --- |
 | Repo discovery | `repo_list_roots`, `repo_tree`, `repo_search`, `repo_fetch_file`, `repo_read_many` |
 | Policy help | `repo_policy_explain` |
-| Planning | `repo_project_brief`, `repo_task_inventory`, `repo_decision_memory`, `repo_change_plan`, `repo_next_action`, `repo_plan_review` |
 | Git review | `repo_git_status`, `repo_git_diff`, `repo_git_review` |
 | File writes | `repo_write_file`, `repo_write_changes` |
 | ChatGPT session continuity | `repo_write_handoff`, `repo_last_write` |
-| Codex/Claude coordination | `repo_prepare_codex_task`, `repo_write_codex_task`, `repo_codex_review` |
+| Codex/Claude coordination | `repo_write_codex_task`, `repo_codex_review` |
 | Local ship flow | `repo_write_stage_commit`, `repo_write_recover` |
-| Workspace execution | `workspace_exec`, `workspace_run_script`, `workspace_run_python`, `workspace_run_bash`, `workspace_reap_processes` |
-| Workspace artifacts | `workspace_create_file_artifact`, `workspace_import_file`, `workspace_file_info` |
-| Workspace writes | `workspace_save_file`, `workspace_write_file`, `workspace_apply_patch`, `workspace_make_dir`, `workspace_cleanup_paths` |
-| Parallel-agent coordination | `workspace_agent_session`, `workspace_claim_task`, `workspace_release_task`, `workspace_acquire_official_lock`, `workspace_release_official_lock` |
+| Workspace execution | `workspace_exec`, `workspace_run_script`, `workspace_reap_processes` |
+| Workspace artifacts | `workspace_create_file_artifact`, `workspace_import_file` |
+| Workspace writes | `workspace_save_file`, `workspace_apply_patch`, `workspace_cleanup_paths` |
+| Parallel-agent coordination | `workspace_claim_task`, `workspace_release_task`, `workspace_acquire_official_lock`, `workspace_release_official_lock` |
 | Workspace policy help | `workspace_policy_explain` |
 
 See [docs/TOOL_SURFACE.md](docs/TOOL_SURFACE.md) for full schemas, examples, output shapes, and recommended workflows.

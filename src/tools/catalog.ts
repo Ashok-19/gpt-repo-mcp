@@ -83,6 +83,16 @@ const hiddenPublicToolNames = new Set<ToolName>([
   "repo_write_unstage",
   "repo_write_commit",
   "repo_cleanup_paths",
+  "repo_project_brief",
+  "repo_task_inventory",
+  "repo_decision_memory",
+  "repo_change_plan",
+  "repo_next_action",
+  "repo_plan_review",
+  "repo_prepare_codex_task",
+  "workspace_run_python",
+  "workspace_run_bash",
+  "workspace_agent_session",
   "workspace_export_file",
   "workspace_tree",
   "workspace_read_file",
@@ -90,7 +100,10 @@ const hiddenPublicToolNames = new Set<ToolName>([
   "workspace_search",
   "workspace_delete_paths",
   "workspace_git_status",
-  "workspace_git_diff"
+  "workspace_git_diff",
+  "workspace_file_info",
+  "workspace_write_file",
+  "workspace_make_dir"
 ]);
 
 const fullToolCatalog: ToolDefinition[] = [

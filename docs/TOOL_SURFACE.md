@@ -6,6 +6,11 @@ the relevant repo policy opts in. Each tool declares an input schema, an output
 schema, and annotations. Runtime results return canonical data in
 `structuredContent` and a short human summary in `content`.
 
+The public catalog omits compatibility aliases, heuristic planning helpers,
+runtime-specific script aliases, and redundant workspace file helpers. Their
+internal contracts remain tested, while ChatGPT sees the smaller task-oriented
+surface exported by `toolCatalog`.
+
 For ChatGPT workflows, prefer `repo_write_stage_commit` for normal reviewed
 stage-and-commit flows and `repo_write_recover` for normal reviewed recovery
 flows. Use `repo_write_stage`, `repo_write_unstage`, `repo_git_restore_paths`,

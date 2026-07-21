@@ -21,8 +21,7 @@ import {
   GitUnstageResultSchema
 } from "../src/contracts/git-operations.contract.js";
 import { CleanupPathsInputSchema, CleanupPathsResultSchema } from "../src/contracts/cleanup.contract.js";
-import { CodexReviewInputSchema, CodexReviewResultSchema, CodexTaskInputSchema, CodexTaskResultSchema, CodexTaskWriteInputSchema, CodexTaskWriteResultSchema } from "../src/contracts/codex-task.contract.js";
-import { DecisionLogInputSchema, DecisionLogResultSchema } from "../src/contracts/decision.contract.js";
+import { CodexReviewInputSchema, CodexReviewResultSchema, CodexTaskWriteInputSchema, CodexTaskWriteResultSchema } from "../src/contracts/codex-task.contract.js";
 import { GitReviewResultSchema } from "../src/contracts/git-review.contract.js";
 import { HandoffInputSchema, HandoffResultSchema } from "../src/contracts/handoff.contract.js";
 import { LastWriteInputSchema, LastWriteResultSchema } from "../src/contracts/operation-receipt.contract.js";
@@ -60,13 +59,6 @@ describe("tool catalog contracts", () => {
       "repo_git_review",
       "repo_write_stage_commit",
       "repo_write_recover",
-      "repo_project_brief",
-      "repo_task_inventory",
-      "repo_decision_memory",
-      "repo_change_plan",
-      "repo_next_action",
-      "repo_plan_review",
-      "repo_prepare_codex_task",
       "repo_write_codex_task",
       "repo_codex_review",
       "repo_write_file",
@@ -75,9 +67,6 @@ describe("tool catalog contracts", () => {
       "workspace_exec",
       "workspace_run_script",
       "workspace_save_file",
-      "workspace_run_python",
-      "workspace_run_bash",
-      "workspace_agent_session",
       "workspace_claim_task",
       "workspace_release_task",
       "workspace_acquire_official_lock",
@@ -85,10 +74,7 @@ describe("tool catalog contracts", () => {
       "workspace_reap_processes",
       "workspace_create_file_artifact",
       "workspace_import_file",
-      "workspace_file_info",
-      "workspace_write_file",
       "workspace_apply_patch",
-      "workspace_make_dir",
       "workspace_cleanup_paths",
       "workspace_policy_explain"
     ]);
@@ -118,23 +104,17 @@ describe("tool catalog contracts", () => {
       "workspace_exec",
       "workspace_run_script",
       "workspace_save_file",
-      "workspace_run_python",
-      "workspace_run_bash",
-      "workspace_agent_session",
       "workspace_claim_task",
       "workspace_release_task",
       "workspace_acquire_official_lock",
       "workspace_release_official_lock",
       "workspace_reap_processes",
       "workspace_import_file",
-      "workspace_write_file",
       "workspace_apply_patch",
-      "workspace_make_dir",
       "workspace_cleanup_paths"
     ]);
     const writeFile = toolCatalog.find((tool) => tool.name === "repo_write_file");
     const policyExplain = toolCatalog.find((tool) => tool.name === "repo_policy_explain");
-    const prepareCodexTask = toolCatalog.find((tool) => tool.name === "repo_prepare_codex_task");
     const writeCodexTask = toolCatalog.find((tool) => tool.name === "repo_write_codex_task");
     const codexReview = toolCatalog.find((tool) => tool.name === "repo_codex_review");
     const writeChanges = toolCatalog.find((tool) => tool.name === "repo_write_changes");
@@ -142,16 +122,11 @@ describe("tool catalog contracts", () => {
     const stageCommit = toolCatalog.find((tool) => tool.name === "repo_write_stage_commit");
     const recover = toolCatalog.find((tool) => tool.name === "repo_write_recover");
     const lastWrite = toolCatalog.find((tool) => tool.name === "repo_last_write");
-    const decisionMemory = toolCatalog.find((tool) => tool.name === "repo_decision_memory");
 
     expect(policyExplain).toBeDefined();
     expect(policyExplain?.inputSchema).toBe(PolicyExplainInputSchema);
     expect(policyExplain?.outputSchema).toBe(PolicyExplainResultSchema);
     expect(policyExplain?.annotations).toEqual(readOnlyAnnotations);
-    expect(prepareCodexTask).toBeDefined();
-    expect(prepareCodexTask?.inputSchema).toBe(CodexTaskInputSchema);
-    expect(prepareCodexTask?.outputSchema).toBe(CodexTaskResultSchema);
-    expect(prepareCodexTask?.annotations).toEqual(readOnlyAnnotations);
     expect(writeCodexTask).toBeDefined();
     expect(writeCodexTask?.inputSchema).toBe(CodexTaskWriteInputSchema);
     expect(writeCodexTask?.outputSchema).toBe(CodexTaskWriteResultSchema);
@@ -164,10 +139,6 @@ describe("tool catalog contracts", () => {
     expect(lastWrite?.inputSchema).toBe(LastWriteInputSchema);
     expect(lastWrite?.outputSchema).toBe(LastWriteResultSchema);
     expect(lastWrite?.annotations).toEqual(readOnlyAnnotations);
-    expect(decisionMemory).toBeDefined();
-    expect(decisionMemory?.inputSchema).toBe(DecisionLogInputSchema);
-    expect(decisionMemory?.outputSchema).toBe(DecisionLogResultSchema);
-    expect(decisionMemory?.annotations).toEqual(readOnlyAnnotations);
     expect(toolCatalog.some((tool) => (tool.name as string) === "repo_decision_log")).toBe(false);
     expect((toolContracts as Record<string, unknown>).repo_decision_log).toBeUndefined();
     expect(writeFile).toBeDefined();
@@ -730,6 +701,13 @@ describe("tool catalog contracts", () => {
     expect(exposedNames).not.toContain("repo_write_unstage");
     expect(exposedNames).not.toContain("repo_write_commit");
     expect(exposedNames).not.toContain("repo_cleanup_paths");
+    expect(exposedNames).not.toContain("repo_project_brief");
+    expect(exposedNames).not.toContain("repo_task_inventory");
+    expect(exposedNames).not.toContain("repo_decision_memory");
+    expect(exposedNames).not.toContain("repo_change_plan");
+    expect(exposedNames).not.toContain("repo_next_action");
+    expect(exposedNames).not.toContain("repo_plan_review");
+    expect(exposedNames).not.toContain("repo_prepare_codex_task");
     expect(exposedNames).not.toContain("workspace_export_file");
     expect(exposedNames).not.toContain("workspace_tree");
     expect(exposedNames).not.toContain("workspace_read_file");
@@ -738,6 +716,12 @@ describe("tool catalog contracts", () => {
     expect(exposedNames).not.toContain("workspace_delete_paths");
     expect(exposedNames).not.toContain("workspace_git_status");
     expect(exposedNames).not.toContain("workspace_git_diff");
+    expect(exposedNames).not.toContain("workspace_run_python");
+    expect(exposedNames).not.toContain("workspace_run_bash");
+    expect(exposedNames).not.toContain("workspace_agent_session");
+    expect(exposedNames).not.toContain("workspace_file_info");
+    expect(exposedNames).not.toContain("workspace_write_file");
+    expect(exposedNames).not.toContain("workspace_make_dir");
 
     for (const tool of toolCatalog) {
       const contract = toolContracts[tool.name];
@@ -1083,194 +1067,6 @@ describe("tool catalog contracts", () => {
         },
         {
           "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks to understand, onboard into, plan work for, summarize, or start a daily planning session for an approved repository. Prefer this as the first planning tool because it returns bounded project signals without reading the whole repo.",
-          "inputKeys": [
-            "include",
-            "repo_id",
-          ],
-          "name": "repo_project_brief",
-          "outputKeys": [
-            "key_docs",
-            "languages",
-            "likely_entrypoints",
-            "package_managers",
-            "project_type",
-            "repo",
-            "scripts",
-            "test_commands",
-            "truncated",
-            "warnings",
-          ],
-          "title": "Create project brief",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks to find repo-local TODOs, FIXMEs, HACKs, roadmap notes, markdown checklist items, backlog candidates, or next tasks. Returns file and line grounded backlog signals for planning.",
-          "inputKeys": [
-            "cursor",
-            "exclude_globs",
-            "include_globs",
-            "labels",
-            "max_results",
-            "repo_id",
-          ],
-          "name": "repo_task_inventory",
-          "outputKeys": [
-            "matched_count",
-            "next_cursor",
-            "returned_count",
-            "scan_complete",
-            "scanned_file_count",
-            "tasks",
-            "truncated",
-            "warnings",
-          ],
-          "title": "Inventory repository tasks",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks about project memory, architecture decisions, conventions, patterns, rationale, or why the project is structured a certain way. Returns bounded evidence-grounded decisions, conventions, and gaps from repo documentation and package metadata.",
-          "inputKeys": [
-            "include_sources",
-            "repo_id",
-          ],
-          "name": "repo_decision_memory",
-          "outputKeys": [
-            "conventions",
-            "decisions",
-            "gaps",
-            "warnings",
-          ],
-          "title": "Extract decision memory",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks how to implement, refactor, debug, fix, or add a feature without writing files. Returns an evidence-grounded implementation plan, likely files, risks, tests, and open questions.",
-          "inputKeys": [
-            "goal",
-            "include_globs",
-            "max_files_to_inspect",
-            "planning_depth",
-            "repo_id",
-          ],
-          "name": "repo_change_plan",
-          "outputKeys": [
-            "estimated_cost",
-            "goal",
-            "open_questions",
-            "proposed_steps",
-            "relevant_files",
-            "scan_complete",
-            "test_strategy",
-            "warnings",
-          ],
-          "title": "Plan repository change",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks what to do next, what to prioritize, whether work is ready to ship, what to clean up, or how to choose focused solo-dev work. Returns advisory next actions from repo status, project brief, and task inventory.",
-          "inputKeys": [
-            "horizon",
-            "mode",
-            "repo_id",
-          ],
-          "name": "repo_next_action",
-          "outputKeys": [
-            "blockers",
-            "confidence",
-            "rationale",
-            "recommendation",
-            "suggested_actions",
-            "useful_context",
-            "warnings",
-          ],
-          "title": "Recommend next action",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks for broad or ambiguous repository review. It estimates scope and suggests whether to ask a clarifying question before reading many files; for onboarding or daily planning prefer repo_project_brief first.",
-          "inputKeys": [
-            "prompt",
-          ],
-          "name": "repo_plan_review",
-          "outputKeys": [
-            "estimated_cost",
-            "explicit_full_repo",
-            "recommended_next_tools",
-            "recommended_scope",
-            "should_ask_clarifying_question",
-            "suggested_question",
-          ],
-          "title": "Plan repository review",
-        },
-        {
-          "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user explicitly wants chat-copy mode: a Codex prompt returned in chat for review/copying. Does not write files or implement the change. Do not use when Codex will be told to implement .chatgpt/codex-runs/<run_id>/PROMPT.md; use repo_write_codex_task instead.",
-          "inputKeys": [
-            "acceptance_criteria",
-            "allowed_paths",
-            "context_summary",
-            "forbidden_paths",
-            "implementation_scope",
-            "inspect_first",
-            "objective",
-            "repo_id",
-            "run_id",
-            "title",
-            "verification_commands",
-          ],
-          "name": "repo_prepare_codex_task",
-          "outputKeys": [
-            "codex_user_prompt",
-            "manifest_path",
-            "next_steps",
-            "ok",
-            "prompt_markdown",
-            "prompt_path",
-            "repo_id",
-            "result_path",
-            "run_id",
-            "warnings",
-          ],
-          "title": "Prepare Codex task prompt",
-        },
-        {
-          "annotations": {
             "destructiveHint": true,
             "idempotentHint": false,
             "openWorldHint": false,
@@ -1558,119 +1354,6 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": false,
           },
-          "description": "Use this when the user asks to run a Python experiment or repo-local Python script. Inline code is stored in workspace scratch before running, and output is bounded.",
-          "inputKeys": [
-            "agent_id",
-            "args",
-            "code",
-            "cwd",
-            "dry_run",
-            "env",
-            "max_stderr_bytes",
-            "max_stdout_bytes",
-            "python",
-            "reason",
-            "repo_id",
-            "script_path",
-            "timeout_seconds",
-          ],
-          "name": "workspace_run_python",
-          "outputKeys": [
-            "agent_id",
-            "cmd",
-            "cwd",
-            "dry_run",
-            "duration_ms",
-            "exit_code",
-            "generated_script_cleaned",
-            "generated_script_path",
-            "interpreter",
-            "script_path",
-            "stderr",
-            "stderr_truncated",
-            "stdout",
-            "stdout_truncated",
-            "timed_out",
-          ],
-          "title": "Run workspace Python",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when the user asks to run a shell experiment or repo-local shell script. Inline script text is stored in workspace scratch before running, and output is bounded.",
-          "inputKeys": [
-            "agent_id",
-            "args",
-            "cwd",
-            "dry_run",
-            "env",
-            "max_stderr_bytes",
-            "max_stdout_bytes",
-            "reason",
-            "repo_id",
-            "script",
-            "script_path",
-            "shell",
-            "timeout_seconds",
-          ],
-          "name": "workspace_run_bash",
-          "outputKeys": [
-            "agent_id",
-            "cmd",
-            "cwd",
-            "dry_run",
-            "duration_ms",
-            "exit_code",
-            "generated_script_cleaned",
-            "generated_script_path",
-            "interpreter",
-            "script_path",
-            "stderr",
-            "stderr_truncated",
-            "stdout",
-            "stdout_truncated",
-            "timed_out",
-          ],
-          "title": "Run workspace shell script",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when a ChatGPT tab or worker needs its own workspace identity and scratch directory. Returns an agent id and scratch/agents path without touching official files.",
-          "inputKeys": [
-            "agent_id",
-            "create_dirs",
-            "label",
-            "reason",
-            "repo_id",
-            "task_id",
-          ],
-          "name": "workspace_agent_session",
-          "outputKeys": [
-            "agent_id",
-            "instructions",
-            "label",
-            "ok",
-            "scratch_root",
-            "task_scratch_path",
-          ],
-          "title": "Create workspace agent session",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
           "description": "Use this when an agent starts focused work on one task. Creates a lightweight per-task claim so parallel agents do not promote the same task concurrently.",
           "inputKeys": [
             "agent_id",
@@ -1851,75 +1534,6 @@ describe("tool catalog contracts", () => {
         },
         {
           "annotations": {
-            "destructiveHint": false,
-            "idempotentHint": true,
-            "openWorldHint": false,
-            "readOnlyHint": true,
-          },
-          "description": "Use this when the user asks for metadata about an approved repo-local path without reading file contents.",
-          "inputKeys": [
-            "include_hash",
-            "include_mime",
-            "path",
-            "repo_id",
-          ],
-          "name": "workspace_file_info",
-          "outputKeys": [
-            "blocked",
-            "blocked_reason",
-            "exists",
-            "exportable",
-            "mime",
-            "modified_time",
-            "path",
-            "permissions",
-            "readable",
-            "sha256",
-            "size_bytes",
-            "type",
-            "writable",
-          ],
-          "title": "Inspect workspace file metadata",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when the user asks to write or exactly edit one UTF-8 text file inside an approved workspace scratch location. Never stages or commits.",
-          "inputKeys": [
-            "action",
-            "agent_id",
-            "content",
-            "create_dirs",
-            "dry_run",
-            "find",
-            "path",
-            "reason",
-            "replace",
-            "repo_id",
-          ],
-          "name": "workspace_write_file",
-          "outputKeys": [
-            "action",
-            "bytes_written",
-            "changed",
-            "created",
-            "dry_run",
-            "new_sha256",
-            "ok",
-            "old_sha256",
-            "operation_receipt",
-            "path",
-            "summary",
-            "warnings",
-          ],
-          "title": "Write workspace scratch file",
-        },
-        {
-          "annotations": {
             "destructiveHint": true,
             "idempotentHint": false,
             "openWorldHint": false,
@@ -1941,31 +1555,6 @@ describe("tool catalog contracts", () => {
             "warnings",
           ],
           "title": "Apply workspace patch",
-        },
-        {
-          "annotations": {
-            "destructiveHint": true,
-            "idempotentHint": false,
-            "openWorldHint": false,
-            "readOnlyHint": false,
-          },
-          "description": "Use this when the user asks to create directories inside approved workspace scratch locations, with dry-run support.",
-          "inputKeys": [
-            "agent_id",
-            "dry_run",
-            "parents",
-            "path",
-            "reason",
-            "repo_id",
-          ],
-          "name": "workspace_make_dir",
-          "outputKeys": [
-            "created",
-            "dry_run",
-            "ok",
-            "path",
-          ],
-          "title": "Create workspace directory",
         },
         {
           "annotations": {

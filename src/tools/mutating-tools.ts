@@ -10,18 +10,13 @@ export const MUTATING_TOOL_NAMES = [
   "workspace_exec",
   "workspace_run_script",
   "workspace_save_file",
-  "workspace_run_python",
-  "workspace_run_bash",
-  "workspace_agent_session",
   "workspace_claim_task",
   "workspace_release_task",
   "workspace_acquire_official_lock",
   "workspace_release_official_lock",
   "workspace_reap_processes",
   "workspace_import_file",
-  "workspace_write_file",
   "workspace_apply_patch",
-  "workspace_make_dir",
   "workspace_cleanup_paths"
 ] as const satisfies readonly ToolName[];
 
