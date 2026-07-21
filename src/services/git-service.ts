@@ -10,12 +10,17 @@ export class GitService {
   constructor(private readonly root: string) {}
 
   async status() {
-    const [branch, headSha, porcelain] = await Promise.all([
+    const [branch, headSha, prefix, porcelain] = await Promise.all([
       this.git(["rev-parse", "--abbrev-ref", "HEAD"]),
       this.git(["rev-parse", "HEAD"]),
-      this.git(["status", "--porcelain=v1", "--untracked-files=all"])
+      this.git(["rev-parse", "--show-prefix"]),
+      this.git(["status", "--porcelain=v1", "--untracked-files=all", "--", "."])
     ]);
-    const files = porcelain.split("\n").filter(Boolean).map(parseStatusLine);
+    const files = porcelain.split("\n").filter(Boolean).map(parseStatusLine).map((file) => ({
+      ...file,
+      path: stripPrefix(file.path, prefix.trim()),
+      ...(file.original_path ? { original_path: stripPrefix(file.original_path, prefix.trim()) } : {})
+    }));
     const counts: Record<string, number> = {};
     for (const file of files) {
       const key = `${file.index}${file.worktree}`.trim() || "clean";
@@ -40,7 +45,7 @@ export class GitService {
     context_lines?: number;
   }) {
     const paths = options.paths?.map(validateRepoPath);
-    const args = ["diff", "--find-renames", `--unified=${options.context_lines ?? 3}`];
+    const args = ["diff", "--relative", "--find-renames", `--unified=${options.context_lines ?? 3}`];
     if (options.staged) {
       args.push("--cached");
     }
@@ -51,6 +56,8 @@ export class GitService {
     }
     if (paths?.length) {
       args.push("--", ...paths);
+    } else {
+      args.push("--", ".");
     }
     const maxBytes = Math.min(options.max_bytes ?? DEFAULT_LIMITS.max_diff_bytes, DEFAULT_LIMITS.max_diff_bytes);
     const raw = await this.git(args, DEFAULT_LIMITS.max_diff_bytes + 1);
@@ -107,6 +114,10 @@ function parseStatusLine(line: string): StatusFile {
     return { index, worktree, path: path ?? rawPath, original_path: originalPath };
   }
   return { index, worktree, path: rawPath };
+}
+
+function stripPrefix(path: string, prefix: string): string {
+  return prefix && path.startsWith(prefix) ? path.slice(prefix.length) : path;
 }
 
 function parseDiff(diff: string) {

@@ -270,14 +270,19 @@ export class GitOperationsService {
   }
 
   private async stagedPaths(): Promise<string[]> {
-    return (await this.git(["diff", "--name-only", "--cached"]))
-      .split("\n")
-      .filter(Boolean)
-      .sort();
+    const [prefix, output] = await Promise.all([
+      this.git(["rev-parse", "--show-prefix"]),
+      this.git(["diff", "--name-only", "--cached"])
+    ]);
+    const rootPrefix = prefix.trim();
+    return output.split("\n").filter(Boolean).map((path) => {
+      if (!rootPrefix) return path;
+      return path.startsWith(rootPrefix) ? path.slice(rootPrefix.length) : `../${path}`;
+    }).sort();
   }
 
   private async statusSummary(): Promise<{ remaining_changes: number; clean_after: boolean }> {
-    const output = await this.git(["status", "--porcelain=v1", "--untracked-files=all"]);
+    const output = await this.git(["status", "--porcelain=v1", "--untracked-files=all", "--", "."]);
     const remainingChanges = output.split("\n").filter(Boolean).length;
     return {
       remaining_changes: remainingChanges,

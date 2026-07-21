@@ -1,8 +1,12 @@
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { runConnectGptCli } from "../src/cli/connect-gpt.js";
+
+const execFileAsync = promisify(execFile);
 
 type CliResult = {
   code: number;
@@ -341,6 +345,23 @@ describe("connect-gpt config CLI", () => {
     const passing = await runCli(["config", "check", "--config", configPath], sandbox);
     expect(passing.code).toBe(0);
     expect(passing.stdout).toContain("PASS 1 repo(s) validated.");
+  });
+
+  test("check accepts a configured subdirectory inside a git worktree", async () => {
+    const sandbox = await mkdtemp(join(tmpdir(), "connect-gpt-cli-"));
+    const projectRoot = join(sandbox, "active-project");
+    const configPath = join(sandbox, "config.local.json");
+    await mkdir(projectRoot, { recursive: true });
+    await execFileAsync("git", ["init"], { cwd: sandbox, env: { PATH: process.env.PATH ?? "" } });
+    await writeFile(configPath, JSON.stringify({
+      repos: [{ repo_id: "active", display_name: "Active", root: projectRoot }],
+      limits: {}
+    }, null, 2));
+
+    const result = await runCli(["config", "check", "--config", configPath], sandbox);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("PASS 1 repo(s) validated.");
   });
 
   test("writes pretty JSON config after add", async () => {

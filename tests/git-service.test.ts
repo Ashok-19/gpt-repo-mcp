@@ -60,6 +60,22 @@ describe("GitService", () => {
     } satisfies Partial<RepoReaderError>);
   });
 
+  test("scopes status and diff to a configured project subdirectory", async () => {
+    const root = await createGitFixture();
+    const projectRoot = join(root, "src");
+    await writeFile(join(projectRoot, "app.ts"), "export const app = 2;\n");
+    await writeFile(join(root, "outside.md"), "outside\n");
+
+    const service = new GitService(projectRoot);
+    const status = await service.status();
+    const diff = await service.diff({});
+
+    expect(status.files).toEqual([{ index: " ", worktree: "M", path: "app.ts" }]);
+    expect(diff.files).toEqual([
+      expect.objectContaining({ path: "app.ts", status: "modified" })
+    ]);
+  });
+
   test("truncates large diffs with warning", async () => {
     const root = await createGitFixture();
     await writeFile(join(root, "src", "app.ts"), Array.from({ length: 40 }, (_, index) => `line ${index}`).join("\n"));

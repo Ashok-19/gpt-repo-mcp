@@ -561,10 +561,16 @@ async function looksLikeGitRepository(root: string): Promise<boolean> {
     await stat(join(root, ".git"));
     return true;
   } catch (error) {
-    if (isNotFoundError(error)) {
-      return false;
-    }
-    throw error;
+    if (!isNotFoundError(error)) throw error;
+  }
+  try {
+    const result = await execFileAsync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: root,
+      env: { PATH: process.env.PATH ?? "" }
+    });
+    return result.stdout.trim() === "true";
+  } catch {
+    return false;
   }
 }
 

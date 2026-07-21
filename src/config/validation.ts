@@ -1,7 +1,11 @@
 import { stat } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { realpath } from "node:fs/promises";
 import { RepoReaderConfigSchema, type RepoReaderConfig } from "./schema.js";
+
+const execFileAsync = promisify(execFile);
 
 export type ConfigIssue = {
   code: string;
@@ -102,10 +106,16 @@ async function looksLikeGitRepository(root: string): Promise<boolean> {
     await stat(join(root, ".git"));
     return true;
   } catch (error) {
-    if (isNotFoundError(error)) {
-      return false;
-    }
-    throw error;
+    if (!isNotFoundError(error)) throw error;
+  }
+  try {
+    const result = await execFileAsync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: root,
+      env: { PATH: process.env.PATH ?? "" }
+    });
+    return result.stdout.trim() === "true";
+  } catch {
+    return false;
   }
 }
 
