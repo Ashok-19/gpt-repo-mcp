@@ -7,6 +7,7 @@ import { IgnoreEngine } from "./ignore-engine.js";
 import { GitService } from "./git-service.js";
 import { OperationsPolicy } from "./operations-policy.js";
 import { OperationReceiptService } from "./operation-receipt-service.js";
+import { issueReviewToken } from "./review-token-service.js";
 
 type StatusFile = GitReviewResult["changed_paths"][number];
 
@@ -95,6 +96,9 @@ export class GitReviewService {
     const expectedCommitPaths = [...new Set([...stagedPaths, ...stagePaths])].sort();
     const recoverRestorePaths = [...new Set([...recoverableWorktreePaths, ...stagedRecoveryPaths])].sort();
     const suggestedCommitMessage = suggestCommitMessage(expectedCommitPaths);
+    const reviewToken = stagePaths.length > 0 && stagedPaths.length === 0 && !hasStagedExcludedPaths
+      ? await issueReviewToken(input.repo_id, this.root, status.head_sha, expectedCommitPaths)
+      : undefined;
     const nextToolPayloads: GitReviewResult["next_tool_payloads"] = {};
 
     if (recoverableWorktreePaths.length > 0) {
@@ -172,22 +176,21 @@ export class GitReviewService {
         expected_head_sha: status.head_sha,
         dry_run: false
       };
-      if (stagedPaths.length === 0 && !hasStagedExcludedPaths) {
-        nextToolPayloads.repo_write_stage_commit_dry_run = {
-          repo_id: input.repo_id,
-          paths: stagePaths,
-          message: suggestedCommitMessage,
-          expected_head_sha: status.head_sha,
-          dry_run: true
-        };
-        nextToolPayloads.repo_write_stage_commit_actual = {
-          repo_id: input.repo_id,
-          paths: stagePaths,
-          message: suggestedCommitMessage,
-          expected_head_sha: status.head_sha,
-          dry_run: false
-        };
-      }
+    }
+
+    if (reviewToken) {
+      nextToolPayloads.repo_write_stage_commit_dry_run = {
+        repo_id: input.repo_id,
+        review_id: reviewToken.review_id,
+        message: suggestedCommitMessage,
+        dry_run: true
+      };
+      nextToolPayloads.repo_write_stage_commit_actual = {
+        repo_id: input.repo_id,
+        review_id: reviewToken.review_id,
+        message: suggestedCommitMessage,
+        dry_run: false
+      };
     }
 
     if (expectedCommitPaths.length > 0) {
@@ -205,6 +208,7 @@ export class GitReviewService {
       branch: status.branch,
       head_sha: status.head_sha,
       clean: status.clean,
+      ...reviewToken,
       changed_paths: changedPaths,
       diff_summary: {
         file_count: totalDiffFiles,

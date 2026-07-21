@@ -181,9 +181,9 @@ Second-pass refinement example:
 Returns a read-only current-change review for low-friction recovery, cleanup, stage, and commit planning. It gathers git status, the default diff summary, explicit changed paths, conservative stage recommendations, a suggested commit message, warnings, and ready-to-run next tool payloads. It does not restore, clean up, stage, unstage, commit, write files, or run shell commands.
 
 Input: `repo_id`, optional `mode` and `max_files`.
-Output: `branch`, `head_sha`, `clean`, `changed_paths[]`, `diff_summary`, `recommendation`, and `next_tool_payloads`.
+Output: `branch`, `head_sha`, `clean`, optional `review_id` and `review_expires_at`, `changed_paths[]`, `diff_summary`, `recommendation`, and `next_tool_payloads`.
 When staged paths exist, `recommendation.warnings` includes `STAGED_RECOVERY_REQUIRES_UNSTAGE_FIRST` and `recommendation.recovery_guidance[]` explains that `repo_git_restore_paths` is worktree-only. For bad staged changes, use the review-provided `repo_write_recover_*` payloads with explicit `unstage_paths` and `restore_paths`, or use low-level unstage/restore tools when granular control is needed.
-`next_tool_payloads` may include composite `repo_write_stage_commit_*` and `repo_write_recover_*` payloads, plus low-level `repo_git_restore_paths_*`, `repo_cleanup_paths_*`, `repo_write_unstage_*`, `repo_write_stage_*`, and `repo_write_commit_dry_run` payloads when applicable. Generated payloads omit optional `reason` fields by design; add a short reason manually only when useful.
+`next_tool_payloads` may include compact `repo_write_stage_commit_*` payloads containing an opaque 30-minute `review_id`, plus `repo_write_recover_*` and low-level payloads when applicable. The server stores the reviewed HEAD, paths, and content hashes and rechecks them before committing. Tokens are lost on server restart and become stale when reviewed state changes. Generated payloads omit optional `reason` fields by design.
 Example:
 
 ```json
@@ -322,7 +322,7 @@ Example:
 
 ### `repo_write_stage_commit`
 
-Stages explicit reviewed repo-relative paths and creates one local commit in a single approved operation. It requires `expected_head_sha`, explicit `paths[]`, and a local commit `message`. It rejects broad pathspecs, unsafe paths, invalid messages, stale HEAD, and any pre-existing staged paths that do not exactly match the requested paths. It verifies the exact staged path set before committing. It does not push, reset, checkout, stash, clean, or run a shell.
+Stages reviewed repo-relative paths and creates one local commit in a single approved operation. Prefer the `review_id` returned by `repo_git_review`; it reuses and rechecks the exact reviewed HEAD, paths, and content hashes. The legacy explicit `paths[]` plus `expected_head_sha` form remains accepted. It rejects stale review state, unsafe paths, invalid messages, and unexpected staged paths. It does not push, reset, checkout, stash, clean, or run a shell.
 
 Use this for the normal happy path after `repo_git_review` when the reviewed diff is good:
 
@@ -331,16 +331,15 @@ repo_git_review
 repo_write_stage_commit
 ```
 
-Input: `repo_id`, `paths[]`, `message`, `expected_head_sha`, optional `dry_run`, and `reason`.
+Input: `repo_id`, `review_id`, `message`, optional `dry_run` and `reason`; or the legacy `paths[]` plus `expected_head_sha` form.
 Output: `ok`, `dry_run`, `head_before`, optional `head_after`, optional `commit_sha`, `staged_paths[]`, `committed_paths[]`, optional `remaining_changes`, optional `clean_after`, and `warnings`.
 Example:
 
 ```json
 {
   "repo_id": "example-repo",
-  "paths": ["docs/WRITE_WORKFLOWS.md", "src/tools/catalog.ts"],
+  "review_id": "00000000-0000-4000-8000-000000000000",
   "message": "Update write workflow docs",
-  "expected_head_sha": "0123456789abcdef0123456789abcdef01234567",
   "dry_run": true
 }
 ```

@@ -34,11 +34,16 @@ export const GitCommitInputSchema = RepoInputSchema.extend({
 });
 
 export const GitStageCommitInputSchema = RepoInputSchema.extend({
-  paths: GitPathsSchema,
+  review_id: z.string().uuid().optional().describe("Opaque review token returned by repo_git_review. Reuses its exact HEAD, paths, and content hashes."),
+  paths: GitPathsSchema.optional().describe("Explicit repo-relative paths to stage and commit when review_id is not supplied."),
   message: z.string().min(1).describe("Local git commit message only. Shell syntax, command chaining, and git flags are not accepted."),
-  expected_head_sha: ExpectedHeadSchema,
+  expected_head_sha: ExpectedHeadSchema.optional().describe("Expected HEAD SHA when review_id is not supplied."),
   dry_run: z.boolean().optional().describe("Validate stage-and-commit inputs without changing the git index, worktree, or HEAD."),
   reason: z.string().min(1).optional().describe("Short human-readable reason for the reviewed stage-and-commit request, useful for audit context.")
+}).superRefine((input, context) => {
+  if (!input.review_id && (!input.paths || !input.expected_head_sha)) {
+    context.addIssue({ code: "custom", message: "Provide review_id, or both paths and expected_head_sha." });
+  }
 });
 
 const OptionalGitPathsSchema = z.array(z.string().min(1)).optional();

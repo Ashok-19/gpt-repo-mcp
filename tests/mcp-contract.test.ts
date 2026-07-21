@@ -363,6 +363,8 @@ describe("MCP contract", () => {
               "next_tool_payloads",
               "ok",
               "recommendation",
+              "review_expires_at",
+              "review_id",
             ],
             "title": "Plan git review",
           },
@@ -373,7 +375,7 @@ describe("MCP contract", () => {
               "openWorldHint": false,
               "readOnlyHint": false,
             },
-            "description": "Use this when the user has reviewed repo_git_review output and explicitly approves staging and committing exact repo-relative paths in one local-only operation. Requires expected HEAD, explicit paths, exact staged path verification, does not push, and never runs shell commands.",
+            "description": "Use this when the user has reviewed repo_git_review output and explicitly approves its local-only commit. Prefer the opaque review_id payload; legacy exact paths and expected HEAD remain accepted. Reviewed hashes and HEAD are rechecked, it does not push, and never runs shell commands.",
             "inputKeys": [
               "dry_run",
               "expected_head_sha",
@@ -381,6 +383,7 @@ describe("MCP contract", () => {
               "paths",
               "reason",
               "repo_id",
+              "review_id",
             ],
             "name": "repo_write_stage_commit",
             "outputKeys": [
@@ -1223,6 +1226,30 @@ describe("MCP contract", () => {
       expect(result.content).toEqual([
         { type: "text", text: expect.stringContaining("Dry run checked handoff") }
       ]);
+    } finally {
+      await close();
+    }
+  });
+
+  test("review token drives dry-run and actual stage-and-commit without repeated paths", async () => {
+    const { client, close, root } = await connectFixtureServer();
+    try {
+      await execFileAsync("git", ["restore", "--staged", "--", "docs/staged.md"], { cwd: root, env: { PATH: process.env.PATH ?? "" } });
+      await writeFile(join(root, "docs", "ARCHITECTURE.md"), "# Architecture\nReviewed token change.\n");
+      const review = await client.callTool({ name: "repo_git_review", arguments: { repo_id: "fixture" } });
+      const reviewId = (review.structuredContent as { review_id?: string }).review_id;
+      expect(reviewId).toEqual(expect.any(String));
+
+      const args = { repo_id: "fixture", review_id: reviewId, message: "Update architecture" };
+      const dryRun = await client.callTool({ name: "repo_write_stage_commit", arguments: { ...args, dry_run: true } });
+      expect(dryRun.structuredContent).toMatchObject({ dry_run: true, committed_paths: ["docs/ARCHITECTURE.md"] });
+
+      const committed = await client.callTool({ name: "repo_write_stage_commit", arguments: { ...args, dry_run: false } });
+      expect(committed.structuredContent).toMatchObject({
+        dry_run: false,
+        commit_sha: expect.stringMatching(/^[a-f0-9]{40}$/),
+        committed_paths: ["docs/ARCHITECTURE.md"]
+      });
     } finally {
       await close();
     }

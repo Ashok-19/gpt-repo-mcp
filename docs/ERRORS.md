@@ -59,6 +59,8 @@ All tool errors return:
 | `GIT_STAGED_PATHS_MISMATCH` | Actual staged paths did not exactly match `expected_staged_paths`. |
 | `GIT_NOTHING_STAGED` | Commit was requested when there were no staged changes. |
 | `GIT_COMMIT_MESSAGE_INVALID` | Commit message was empty or looked like command syntax rather than a local commit message. |
+| `GIT_REVIEW_TOKEN_INVALID` | The opaque review token is unknown, expired, belongs to another repository, or was lost on server restart. |
+| `GIT_REVIEW_TOKEN_STALE` | HEAD or reviewed file content changed after the review token was issued. Run `repo_git_review` again. |
 | `CLEANUP_DISABLED` | Cleanup was requested without both `operations.enabled` and `operations.cleanup_enabled`. |
 | `CLEANUP_PATHS_REQUIRED` | Cleanup received an empty path list. |
 | `CLEANUP_UNSAFE_PATH` | Cleanup target was absolute, traversal, broad, `.git`, `.env`, secret-looking, a symlink escape, or an unsupported file type. |

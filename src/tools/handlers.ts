@@ -27,6 +27,7 @@ import { WorkspacePolicy } from "../services/workspace-policy.js";
 import { WorkspaceService } from "../services/workspace-service.js";
 import { WorkspaceAgentService } from "../services/workspace-agent-service.js";
 import { OperationReceiptService } from "../services/operation-receipt-service.js";
+import { verifyReviewToken } from "../services/review-token-service.js";
 import { createErrorEnvelope, createSuccessEnvelope } from "../runtime/result-envelope.js";
 import { toRepoReaderError } from "../runtime/errors.js";
 import { audit } from "../runtime/telemetry.js";
@@ -214,7 +215,14 @@ export const writeCommitHandler: ToolHandler = async (input, context) => safeToo
 
 export const writeStageCommitHandler: ToolHandler = async (input, context) => safeTool<GitStageCommitInput>("repo_write_stage_commit", input, context, async (args) => {
   const repo = context.registry.get(args.repo_id);
-  const result = await new GitOperationsService(repo.root, new OperationsPolicy(repo.operations)).stageCommit(args);
+  const reviewed = args.review_id
+    ? await verifyReviewToken(args.review_id, args.repo_id, repo.root)
+    : { paths: args.paths!, expected_head_sha: args.expected_head_sha! };
+  const result = await new GitOperationsService(repo.root, new OperationsPolicy(repo.operations)).stageCommit({
+    ...reviewed,
+    message: args.message,
+    dry_run: args.dry_run
+  });
   audit({ tool: "repo_write_stage_commit", repo_id: args.repo_id, paths: result.committed_paths, warnings: result.warnings });
   return createSuccessEnvelope(result, result.dry_run ? `Dry run checked stage and commit for ${result.committed_paths.length} paths.` : `Staged and committed ${result.committed_paths.length} paths.`);
 });

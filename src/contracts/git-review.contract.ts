@@ -54,6 +54,8 @@ export const GitReviewResultSchema = z.object({
   branch: z.string(),
   head_sha: z.string(),
   clean: z.boolean(),
+  review_id: z.string().uuid().optional(),
+  review_expires_at: z.string().datetime().optional(),
   changed_paths: z.array(ChangedPathSchema),
   diff_summary: DiffSummarySchema,
   recommendation: z.object({
@@ -79,16 +81,18 @@ export const GitReviewResultSchema = z.object({
     repo_write_stage_actual: StagePayloadSchema.extend({ dry_run: z.literal(false) }).optional(),
     repo_write_stage_commit_dry_run: z.object({
       repo_id: z.string(),
-      paths: z.array(z.string()),
+      review_id: z.string().optional(),
+      paths: z.array(z.string()).optional(),
       message: z.string(),
-      expected_head_sha: z.string(),
+      expected_head_sha: z.string().optional(),
       dry_run: z.literal(true)
     }).optional(),
     repo_write_stage_commit_actual: z.object({
       repo_id: z.string(),
-      paths: z.array(z.string()),
+      review_id: z.string().optional(),
+      paths: z.array(z.string()).optional(),
       message: z.string(),
-      expected_head_sha: z.string(),
+      expected_head_sha: z.string().optional(),
       dry_run: z.literal(false)
     }).optional(),
     repo_write_recover_dry_run: RecoverPayloadSchema.extend({ dry_run: z.literal(true) }).optional(),

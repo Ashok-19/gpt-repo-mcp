@@ -10,6 +10,7 @@ import { GitOperationsService } from "../src/services/git-operations-service.js"
 import { GitReviewService } from "../src/services/git-review-service.js";
 import { OperationsPolicy } from "../src/services/operations-policy.js";
 import { OperationReceiptService } from "../src/services/operation-receipt-service.js";
+import { verifyReviewToken } from "../src/services/review-token-service.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -73,18 +74,18 @@ describe("GitReviewService", () => {
       expected_staged_paths: ["docs/a.md"],
       dry_run: true
     });
+    expect(result.review_id).toEqual(expect.any(String));
+    expect(result.review_expires_at).toEqual(expect.any(String));
     expect(result.next_tool_payloads.repo_write_stage_commit_dry_run).toEqual({
       repo_id: "fixture",
-      paths: ["docs/a.md"],
+      review_id: result.review_id,
       message: "Update docs",
-      expected_head_sha: fixture.head,
       dry_run: true
     });
     expect(result.next_tool_payloads.repo_write_stage_commit_actual).toEqual({
       repo_id: "fixture",
-      paths: ["docs/a.md"],
+      review_id: result.review_id,
       message: "Update docs",
-      expected_head_sha: fixture.head,
       dry_run: false
     });
     expect(result.next_tool_payloads.repo_write_recover_dry_run).toEqual({
@@ -107,7 +108,8 @@ describe("GitReviewService", () => {
       dry_run: true,
       staged_paths: ["docs/a.md"]
     });
-    await expect(operations.stageCommit(result.next_tool_payloads.repo_write_stage_commit_dry_run!)).resolves.toMatchObject({
+    const reviewed = await verifyReviewToken(result.review_id!, "fixture", fixture.root);
+    await expect(operations.stageCommit({ ...reviewed, message: "Update docs", dry_run: true })).resolves.toMatchObject({
       dry_run: true,
       staged_paths: ["docs/a.md"],
       committed_paths: ["docs/a.md"]
@@ -119,6 +121,18 @@ describe("GitReviewService", () => {
     await expect(operations.recover(result.next_tool_payloads.repo_write_recover_dry_run!)).resolves.toMatchObject({
       dry_run: true,
       restored_paths: ["docs/a.md"]
+    });
+  });
+
+  test("review tokens reject content changes after review", async () => {
+    const fixture = await createGitFixture();
+    await writeFile(join(fixture.root, "docs", "a.md"), "reviewed\n");
+    const result = await new GitReviewService(fixture.root).review({ repo_id: "fixture" });
+
+    await writeFile(join(fixture.root, "docs", "a.md"), "changed again\n");
+
+    await expect(verifyReviewToken(result.review_id!, "fixture", fixture.root)).rejects.toMatchObject({
+      code: "GIT_REVIEW_TOKEN_STALE"
     });
   });
 
@@ -323,7 +337,8 @@ describe("GitReviewService", () => {
       file_count: 1,
       files: [{ path, status: "added", hunk_count: 1, summary: expect.stringContaining("sha256") }]
     });
-    expect(result.next_tool_payloads.repo_write_stage_commit_actual?.paths).toEqual([path]);
+    expect(result.next_tool_payloads.repo_write_stage_commit_actual?.review_id).toBe(result.review_id);
+    await expect(verifyReviewToken(result.review_id!, "fixture", fixture.root)).resolves.toMatchObject({ paths: [path] });
   });
 
   test("excludes an MCP-created file when its recorded hash no longer matches", async () => {

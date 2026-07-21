@@ -34,7 +34,7 @@ export const descriptions = {
   repo_write_commit:
     "Use this when the user explicitly asks to create a local-only commit from already staged reviewed paths, or staged-only flow requires a commit without staging; prefer repo_write_stage_commit after repo_git_review for normal reviewed commits. Requires user approval, exact staged path verification, expected HEAD, does not push, and never runs shell commands.",
   repo_write_stage_commit:
-    "Use this when the user has reviewed repo_git_review output and explicitly approves staging and committing exact repo-relative paths in one local-only operation. Requires expected HEAD, explicit paths, exact staged path verification, does not push, and never runs shell commands.",
+    "Use this when the user has reviewed repo_git_review output and explicitly approves its local-only commit. Prefer the opaque review_id payload; legacy exact paths and expected HEAD remain accepted. Reviewed hashes and HEAD are rechecked, it does not push, and never runs shell commands.",
   repo_write_recover:
     "Use this when the user has reviewed repo_git_review output and explicitly approves recovering exact repo-relative paths in one operation. Can unstage, restore tracked worktree paths, and clean configured generated artifacts; requires expected HEAD, explicit paths, does not reset, checkout, stash, clean, commit, push, or run shell commands.",
   repo_cleanup_paths:

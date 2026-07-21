@@ -999,6 +999,8 @@ describe("tool catalog contracts", () => {
             "next_tool_payloads",
             "ok",
             "recommendation",
+            "review_expires_at",
+            "review_id",
           ],
           "title": "Plan git review",
         },
@@ -1009,7 +1011,7 @@ describe("tool catalog contracts", () => {
             "openWorldHint": false,
             "readOnlyHint": false,
           },
-          "description": "Use this when the user has reviewed repo_git_review output and explicitly approves staging and committing exact repo-relative paths in one local-only operation. Requires expected HEAD, explicit paths, exact staged path verification, does not push, and never runs shell commands.",
+          "description": "Use this when the user has reviewed repo_git_review output and explicitly approves its local-only commit. Prefer the opaque review_id payload; legacy exact paths and expected HEAD remain accepted. Reviewed hashes and HEAD are rechecked, it does not push, and never runs shell commands.",
           "inputKeys": [
             "dry_run",
             "expected_head_sha",
@@ -1017,6 +1019,7 @@ describe("tool catalog contracts", () => {
             "paths",
             "reason",
             "repo_id",
+            "review_id",
           ],
           "name": "repo_write_stage_commit",
           "outputKeys": [
