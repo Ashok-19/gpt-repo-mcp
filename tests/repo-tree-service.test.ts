@@ -13,7 +13,8 @@ describe("RepoTreeService", () => {
 
     expect(result.entries).toContainEqual({ path: "src/app.ts", type: "file", size_bytes: expect.any(Number) });
     expect(result.entries.some((entry) => "text" in entry)).toBe(false);
-    expect(result.entries.some((entry) => entry.path.startsWith("node_modules/"))).toBe(false);
+    expect(result.entries.some((entry) => entry.path === "node_modules" || entry.path.startsWith("node_modules/"))).toBe(false);
+    expect(result.entries.some((entry) => entry.path === ".git" || entry.path.startsWith(".git/"))).toBe(false);
     expect(result.excluded_summary.default_excludes).toBeGreaterThan(0);
   });
 

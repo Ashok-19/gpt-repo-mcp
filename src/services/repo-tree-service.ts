@@ -74,7 +74,10 @@ export class RepoTreeService {
             continue;
           }
           const includedByFlag = (isDependency && options.include_dependencies) || (isGenerated && options.include_generated);
-          if (respectDefaultExcludes && !includedByFlag && this.ignoreEngine.isIgnored(childRepoPath)) {
+          const ignoredByDefault = child.isDirectory()
+            ? this.ignoreEngine.isIgnoredDirectory(childRepoPath)
+            : this.ignoreEngine.isIgnored(childRepoPath);
+          if (respectDefaultExcludes && !includedByFlag && ignoredByDefault) {
             excludedSummary.default_excludes = (excludedSummary.default_excludes ?? 0) + 1;
             continue;
           }

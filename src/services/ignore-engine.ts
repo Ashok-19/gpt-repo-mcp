@@ -12,6 +12,11 @@ export class IgnoreEngine {
     return this.matcher.ignores(normalized);
   }
 
+  isIgnoredDirectory(repoPath: string): boolean {
+    const normalized = normalizeRepoPath(repoPath);
+    return this.matcher.ignores(normalized) || this.matcher.ignores(`${normalized}/.mcp-entry`);
+  }
+
   isSensitiveCandidate(repoPath: string): boolean {
     const normalized = normalizeRepoPath(repoPath);
     if (isPublicEnvTemplatePath(normalized)) {

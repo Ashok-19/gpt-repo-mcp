@@ -7,6 +7,10 @@ describe("IgnoreEngine", () => {
 
     expect(engine.isIgnored("node_modules/pkg/index.js")).toBe(true);
     expect(engine.isIgnored(".git/config")).toBe(true);
+    expect(engine.isIgnoredDirectory(".git")).toBe(true);
+    expect(engine.isIgnoredDirectory(".venv")).toBe(true);
+    expect(engine.isIgnoredDirectory(".pytest_cache")).toBe(true);
+    expect(engine.isIgnoredDirectory(".ruff_cache")).toBe(true);
     expect(engine.isIgnored("src/index.ts")).toBe(false);
   });
 
