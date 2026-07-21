@@ -177,7 +177,9 @@ describe("WorkspaceService", () => {
     });
     expect(python.exit_code).toBe(0);
     expect(python.stdout).toContain("python-ok");
-    expect(python.generated_script_path).toMatch(/^scratch\/agents\/agent-a\/workspace-runs\/.+\.py$/);
+    expect(python.generated_script_cleaned).toBe(true);
+    expect(python.generated_script_path).toBeUndefined();
+    await expect(readFile(join(fixture.root, python.script_path))).rejects.toMatchObject({ code: "ENOENT" });
     await expect(readFile(join(fixture.root, "scratch", "agents", "agent-a", "task001", "model.onnx"))).resolves.toEqual(Buffer.from("ONNX"));
 
     const shell = await service.runBash({
@@ -189,7 +191,8 @@ describe("WorkspaceService", () => {
     });
     expect(shell.exit_code).toBe(0);
     expect(shell.stdout).toContain("shell-ok");
-    expect(shell.generated_script_path).toMatch(/^scratch\/agents\/agent-a\/workspace-runs\/.+\.sh$/);
+    expect(shell.generated_script_cleaned).toBe(true);
+    expect(shell.generated_script_path).toBeUndefined();
 
     const neutral = await service.runScript({
       agent_id: "agent-a",
@@ -201,6 +204,57 @@ describe("WorkspaceService", () => {
     });
     expect(neutral.exit_code).toBe(0);
     expect(neutral.stdout).toContain("neutral-ok");
+    expect(neutral.generated_script_cleaned).toBe(true);
+  });
+
+  test("does not materialize dry-run wrappers and retains failed wrappers", async () => {
+    const fixture = await createRepoFixture();
+    const service = await workspace(fixture.root);
+    const dryRun = await service.runScript({
+      runtime: "py",
+      script: "print('dry')\n",
+      dry_run: true,
+      reason: "Preview script"
+    });
+    expect(dryRun.generated_script_cleaned).toBe(true);
+    await expect(readFile(join(fixture.root, dryRun.script_path))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(stat(join(fixture.root, "scratch", "agents"))).rejects.toMatchObject({ code: "ENOENT" });
+
+    const failed = await service.runScript({
+      runtime: "py",
+      script: "raise SystemExit(2)\n",
+      reason: "Run failing script"
+    });
+    expect(failed.exit_code).toBe(2);
+    expect(failed.generated_script_cleaned).toBe(false);
+    await expect(readFile(join(fixture.root, failed.generated_script_path!), "utf8")).resolves.toContain("SystemExit");
+  });
+
+  test("executes the same safe command deterministically and accepts uv argv", async () => {
+    const fixture = await createRepoFixture();
+    const service = await workspace(fixture.root);
+    for (let run = 0; run < 5; run += 1) {
+      await expect(service.exec({ cwd: ".", cmd: ["node", "--version"], reason: "Repeat validation" }))
+        .resolves.toMatchObject({ exit_code: 0, timed_out: false });
+    }
+    await expect(service.exec({ cwd: ".", cmd: ["uv", "run", "pytest", "-q"], dry_run: true, reason: "Preview uv validation" }))
+      .resolves.toMatchObject({ dry_run: true, cmd: ["uv", "run", "pytest", "-q"] });
+  });
+
+  test("distinguishes a missing executable from policy rejection", async () => {
+    const fixture = await createRepoFixture();
+    const service = await workspace(fixture.root);
+
+    await expect(service.exec({ cwd: ".", cmd: ["definitely-not-an-executable"], reason: "Probe missing executable" }))
+      .rejects.toMatchObject({
+        code: "EXECUTABLE_NOT_FOUND",
+        diagnostics: {
+          policy_stage: "execution",
+          reason_code: "EXECUTABLE_NOT_FOUND",
+          trigger: "definitely-not-an-executable",
+          mutation_occurred: false
+        }
+      });
   });
 
   test("saves binary files directly inside the approved repo", async () => {
@@ -230,12 +284,12 @@ describe("WorkspaceService", () => {
     const fixture = await createRepoFixture();
     const service = await workspace(fixture.root);
 
-    await expect(service.exec({ cwd: ".", cmd: ["sudo", "id"], reason: "Probe block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
+    await expect(service.exec({ cwd: ".", cmd: ["sudo", "id"], reason: "Probe block" })).rejects.toMatchObject({ code: "EXECUTION_POLICY_REJECTED" });
     await expect(service.exec({ cwd: ".", cmd: ["curl", "https://example.com"], dry_run: true, reason: "Probe network family" })).resolves.toMatchObject({ dry_run: true });
     await expect(service.exec({ cwd: ".", cmd: ["timeout", "5", "curl", "https://example.com"], dry_run: true, reason: "Probe timeout wrapper" })).resolves.toMatchObject({ dry_run: true });
-    await expect(service.exec({ cwd: ".", cmd: ["git", "push"], reason: "Probe block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
+    await expect(service.exec({ cwd: ".", cmd: ["git", "push"], reason: "Probe block" })).rejects.toMatchObject({ code: "EXECUTION_POLICY_REJECTED" });
     await expect(service.exec({ cwd: ".", cmd: ["python3", "../outside.py"], reason: "Probe path block" })).rejects.toMatchObject({ code: "PATH_TRAVERSAL_REJECTED" });
-    await expect(service.exec({ cwd: ".", cmd: ["bash", "-lc", "python3 --version && cat README.md"], reason: "Probe shell operator block" })).rejects.toMatchObject({ code: "OPERATIONS_DISABLED" });
+    await expect(service.exec({ cwd: ".", cmd: ["bash", "-lc", "python3 --version && cat README.md"], reason: "Probe shell operator block" })).rejects.toMatchObject({ code: "EXECUTION_POLICY_REJECTED" });
   });
 
   test("allows repo-local secret reads and rm through exec while still blocking traversal", async () => {

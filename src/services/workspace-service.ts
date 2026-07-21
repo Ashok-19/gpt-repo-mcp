@@ -128,7 +128,15 @@ export class WorkspaceService {
       child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
       child.on("error", (error) => {
         clearTimeout(timer);
-        reject(new RepoReaderError("INTERNAL_ERROR", error.message));
+        const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+        reject(new RepoReaderError(missing ? "EXECUTABLE_NOT_FOUND" : "INTERNAL_ERROR", error.message, {
+          diagnostics: missing ? {
+            policy_stage: "execution",
+            reason_code: "EXECUTABLE_NOT_FOUND",
+            trigger: basename(cmd[0] ?? ""),
+            mutation_occurred: false
+          } : undefined
+        }));
       });
       child.on("close", (code) => {
         clearTimeout(timer);
@@ -155,7 +163,8 @@ export class WorkspaceService {
       inlineContent: input.code,
       scriptPath: input.script_path,
       extension: "py",
-      label: "python"
+      label: "python",
+      dryRun: input.dry_run
     });
     const interpreter = input.python ?? "python3";
     const result = await this.exec({
@@ -169,12 +178,7 @@ export class WorkspaceService {
       dry_run: input.dry_run,
       reason: input.reason
     });
-    return {
-      ...result,
-      interpreter,
-      script_path: prepared.repoPath,
-      ...(prepared.generated ? { generated_script_path: prepared.repoPath } : {})
-    };
+    return await this.finishScriptRun(prepared, result, interpreter, input.dry_run);
   }
 
   async runBash(input: Omit<WorkspaceRunBashInput, "repo_id">) {
@@ -185,7 +189,8 @@ export class WorkspaceService {
       inlineContent: input.script,
       scriptPath: input.script_path,
       extension: "sh",
-      label: "bash"
+      label: "bash",
+      dryRun: input.dry_run
     });
     const interpreter = input.shell ?? "bash";
     const result = await this.exec({
@@ -199,12 +204,7 @@ export class WorkspaceService {
       dry_run: input.dry_run,
       reason: input.reason
     });
-    return {
-      ...result,
-      interpreter,
-      script_path: prepared.repoPath,
-      ...(prepared.generated ? { generated_script_path: prepared.repoPath } : {})
-    };
+    return await this.finishScriptRun(prepared, result, interpreter, input.dry_run);
   }
 
   async runScript(input: Omit<WorkspaceRunScriptInput, "repo_id">) {
@@ -529,6 +529,7 @@ export class WorkspaceService {
     scriptPath?: string;
     extension: "py" | "sh" | "js";
     label: "python" | "bash" | "node" | "script";
+    dryRun?: boolean;
   }): Promise<{ repoPath: string; execPath: string; generated: boolean }> {
     if ((input.inlineContent ? 1 : 0) + (input.scriptPath ? 1 : 0) !== 1) {
       throw new RepoReaderError("VALIDATION_ERROR", `Provide exactly one of ${input.label === "python" ? "code" : "script"} or script_path.`);
@@ -546,8 +547,10 @@ export class WorkspaceService {
     const agentId = input.agentId ?? `auto-${randomUUID().slice(0, 8)}`;
     const repoPath = `scratch/agents/${agentId}/workspace-runs/${Date.now()}-${randomUUID().slice(0, 8)}.${input.extension}`;
     this.policy.assertWritePath(repoPath);
-    const absolutePath = await this.resolveWriteTarget(repoPath, true);
-    await writeFile(absolutePath, input.inlineContent ?? "", "utf8");
+    const absolutePath = input.dryRun ? join(this.root, repoPath) : await this.resolveWriteTarget(repoPath, true);
+    if (!input.dryRun) {
+      await writeFile(absolutePath, input.inlineContent ?? "", "utf8");
+    }
     return { repoPath, execPath: absolutePath, generated: true };
   }
 
@@ -559,7 +562,8 @@ export class WorkspaceService {
       inlineContent: input.script,
       scriptPath: input.script_path,
       extension: "js",
-      label: "node"
+      label: "node",
+      dryRun: input.dry_run
     });
     const interpreter = "node";
     const result = await this.exec({
@@ -573,11 +577,25 @@ export class WorkspaceService {
       dry_run: input.dry_run,
       reason: input.reason
     });
+    return await this.finishScriptRun(prepared, result, interpreter, input.dry_run);
+  }
+
+  private async finishScriptRun(
+    prepared: { repoPath: string; execPath: string; generated: boolean },
+    result: Awaited<ReturnType<WorkspaceService["exec"]>>,
+    interpreter: string,
+    dryRun?: boolean
+  ) {
+    const cleaned = prepared.generated && (dryRun || (result.exit_code === 0 && !result.timed_out));
+    if (cleaned && !dryRun) {
+      await rm(prepared.execPath, { force: true });
+    }
     return {
       ...result,
       interpreter,
       script_path: prepared.repoPath,
-      ...(prepared.generated ? { generated_script_path: prepared.repoPath } : {})
+      ...(prepared.generated && !cleaned ? { generated_script_path: prepared.repoPath } : {}),
+      ...(prepared.generated ? { generated_script_cleaned: cleaned } : {})
     };
   }
 
@@ -601,16 +619,16 @@ export class WorkspaceService {
       throw new RepoReaderError("VALIDATION_ERROR", "cmd must contain an executable.");
     }
     if (this.policy.config.exec_block_sudo && SUDO_COMMANDS.has(exe)) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", `Command is blocked: ${exe}`);
+      this.rejectCommand("ADMIN_COMMAND_BLOCKED", exe, `Command is blocked: ${exe}`);
     }
     if (this.policy.config.exec_block_network && NETWORK_COMMANDS.has(exe)) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", `Network command is blocked: ${exe}`);
+      this.rejectCommand("NETWORK_COMMAND_BLOCKED", exe, `Network command is blocked: ${exe}`);
     }
     if (exe === "git") {
       const subcommand = cmd.find((arg, index) => index > 0 && !arg.startsWith("-"));
       const blocked = new Set(["push", "reset", "clean", "checkout", "switch"]);
       if (subcommand && blocked.has(subcommand)) {
-        throw new RepoReaderError("OPERATIONS_DISABLED", `Git subcommand is blocked: ${subcommand ?? ""}`);
+        this.rejectCommand("GIT_SUBCOMMAND_BLOCKED", subcommand, `Git subcommand is blocked: ${subcommand}`);
       }
     }
     if (exe === "timeout") {
@@ -619,25 +637,29 @@ export class WorkspaceService {
     if (exe === "bash" || exe === "sh") {
       if (cmd[1] === "-lc") {
         if (cmd.length !== 3) {
-          throw new RepoReaderError("OPERATIONS_DISABLED", `${exe} -lc must contain exactly one simple command string.`);
+          this.rejectCommand("SHELL_WRAPPER_INVALID", `${exe} -lc`, `${exe} -lc must contain exactly one simple command string.`, "Pass a direct argv command to workspace_exec.");
         }
         this.assertCommandAllowed(splitSimpleShellCommand(cmd[2] ?? ""), depth + 1);
       } else if (cmd.includes("-c") || cmd.length < 2 || cmd[1]?.startsWith("-")) {
-        throw new RepoReaderError("OPERATIONS_DISABLED", `${exe} may only run an explicit local script file or a checked -lc command.`);
+        this.rejectCommand("SHELL_WRAPPER_INVALID", exe, `${exe} may only run an explicit local script file or a checked -lc command.`, "Use workspace_run_script for inline scripts.");
       }
     }
     if (cmd.some((arg) => arg.includes("\0"))) {
       throw new RepoReaderError("VALIDATION_ERROR", "NUL bytes are not allowed in cmd.");
     }
     if (cmd.length === 1 && /[\s;&|`$<>]/.test(cmd[0] ?? "")) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", "Shell command strings are not allowed; pass an argv array.");
+      this.rejectCommand("SHELL_COMMAND_STRING_BLOCKED", cmd[0] ?? "", "Shell command strings are not allowed; pass an argv array.", "Pass executable and arguments as separate cmd items.");
     }
     if (/[\s;&|`$<>]/.test(cmd[0] ?? "")) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", "Executable name is not allowed.");
+      this.rejectCommand("EXECUTABLE_NAME_INVALID", cmd[0] ?? "", "Executable name is not allowed.");
     }
     if (cmd.join(" ") === "rm -rf /") {
-      throw new RepoReaderError("OPERATIONS_DISABLED", "Dangerous rm command is blocked.");
+      this.rejectCommand("DANGEROUS_DELETE_BLOCKED", "rm -rf /", "Dangerous rm command is blocked.");
     }
+  }
+
+  private rejectCommand(reasonCode: string, trigger: string, message: string, allowedAlternative?: string): never {
+    throw commandPolicyError(reasonCode, trigger, message, allowedAlternative);
   }
 
   private async assertNoOutsideAbsolutePaths(cmd: string[]): Promise<void> {
@@ -702,7 +724,7 @@ export class WorkspaceService {
     for (const arg of pathArgs) {
       const repoPath = await this.normalizeCommandPathArg(cwdRepoPath, arg);
       if (arg === "/" || arg === "." || repoPath === ".") {
-        throw new RepoReaderError("OPERATIONS_DISABLED", `Unsafe ${exe} target rejected: ${arg}`);
+        throw commandPolicyError("UNSAFE_MUTATION_TARGET", arg, `Unsafe ${exe} target rejected: ${arg}`);
       }
       this.assertRepoMutablePath(repoPath);
     }
@@ -780,6 +802,18 @@ function cappedCollector(maxBytes: number) {
   };
 }
 
+function commandPolicyError(reasonCode: string, trigger: string, message: string, allowedAlternative?: string): RepoReaderError {
+  return new RepoReaderError("EXECUTION_POLICY_REJECTED", message, {
+    diagnostics: {
+      policy_stage: "pre_execution",
+      reason_code: reasonCode,
+      trigger,
+      ...(allowedAlternative ? { allowed_alternative: allowedAlternative } : {}),
+      mutation_occurred: false
+    }
+  });
+}
+
 function killProcessTree(pid?: number): void {
   if (!pid) return;
   try {
@@ -840,7 +874,7 @@ function parseTimeoutWrappedCommand(cmd: string[]): string[] {
       continue;
     }
     if (arg.startsWith("-")) {
-      throw new RepoReaderError("OPERATIONS_DISABLED", `Unsupported timeout option: ${arg}`);
+      throw commandPolicyError("TIMEOUT_OPTION_UNSUPPORTED", arg, `Unsupported timeout option: ${arg}`);
     }
     index += 1;
     break;
@@ -857,7 +891,7 @@ function splitSimpleShellCommand(command: string): string[] {
     throw new RepoReaderError("VALIDATION_ERROR", "Shell command string must not be empty.");
   }
   if (/[\0\r\n;&|`$<>]/.test(command)) {
-    throw new RepoReaderError("OPERATIONS_DISABLED", "Shell control operators and substitutions are blocked.");
+    throw commandPolicyError("SHELL_CONTROL_OPERATOR_BLOCKED", command, "Shell control operators and substitutions are blocked.", "Pass a direct argv command to workspace_exec.");
   }
   const args: string[] = [];
   let current = "";
@@ -865,7 +899,7 @@ function splitSimpleShellCommand(command: string): string[] {
   for (let index = 0; index < command.length; index += 1) {
     const char = command[index] ?? "";
     if (char === "\\") {
-      throw new RepoReaderError("OPERATIONS_DISABLED", "Backslash escaping is not allowed in shell command strings.");
+      throw commandPolicyError("SHELL_ESCAPE_BLOCKED", "\\", "Backslash escaping is not allowed in shell command strings.", "Pass a direct argv command to workspace_exec.");
     }
     if (quote) {
       if (char === quote) {

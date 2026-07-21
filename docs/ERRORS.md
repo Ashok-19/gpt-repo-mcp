@@ -48,6 +48,8 @@ All tool errors return:
 | `WRITE_FIND_NOT_FOUND` | The requested `find` text was not present in the target file. |
 | `WRITE_FIND_NOT_UNIQUE` | The requested `find` text appeared more than once in the target file. |
 | `OPERATIONS_DISABLED` | A git or cleanup operation was requested without `operations.enabled`. |
+| `EXECUTION_POLICY_REJECTED` | A workspace command was rejected before execution. Diagnostics identify the policy stage, stable reason, trigger, safe alternative when available, and whether mutation occurred. |
+| `EXECUTABLE_NOT_FOUND` | The requested executable was not found when command execution started. |
 | `GIT_STAGE_DISABLED` | Git stage or unstage was requested without stage operations enabled. |
 | `GIT_COMMIT_DISABLED` | Git commit was requested without commit operations enabled. |
 | `GIT_HEAD_MISMATCH` | Current HEAD did not match the supplied `expected_head_sha`. |

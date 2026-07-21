@@ -86,6 +86,13 @@ function sanitizeDiagnostics(diagnostics: Record<string, unknown>): Record<strin
   copyShaDiagnostic(diagnostics, safe, "head_sha");
   copyShaDiagnostic(diagnostics, safe, "expected_head_sha");
   copySafeTextDiagnostic(diagnostics, safe, "recovery_hint");
+  copySafeTextDiagnostic(diagnostics, safe, "policy_stage");
+  copySafeTextDiagnostic(diagnostics, safe, "reason_code");
+  copySafeTextDiagnostic(diagnostics, safe, "trigger");
+  copySafeTextDiagnostic(diagnostics, safe, "allowed_alternative");
+  if (typeof diagnostics.mutation_occurred === "boolean") {
+    safe.mutation_occurred = diagnostics.mutation_occurred;
+  }
 
   return Object.keys(safe).length > 0 ? safe : undefined;
 }

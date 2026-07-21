@@ -47,4 +47,24 @@ describe("result envelope", () => {
     expect(serialized).not.toContain("/Users/example");
     expect(serialized).not.toContain("@@ secret");
   });
+
+  test("returns actionable execution rejection diagnostics", () => {
+    const result = createErrorEnvelope(new RepoReaderError("EXECUTION_POLICY_REJECTED", "Network command is blocked: curl", {
+      diagnostics: {
+        policy_stage: "pre_execution",
+        reason_code: "NETWORK_COMMAND_BLOCKED",
+        trigger: "curl",
+        allowed_alternative: "Use a configured connector.",
+        mutation_occurred: false
+      }
+    }));
+
+    expect(result.structuredContent.error.diagnostics).toEqual({
+      policy_stage: "pre_execution",
+      reason_code: "NETWORK_COMMAND_BLOCKED",
+      trigger: "curl",
+      allowed_alternative: "Use a configured connector.",
+      mutation_occurred: false
+    });
+  });
 });

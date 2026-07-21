@@ -64,9 +64,9 @@ export const descriptions = {
   repo_write_handoff:
     "Use this when the user asks for a local-only ChatGPT handoff: skapa handoff, create handoff, skriv handoff, session handoff, resume note, fortsättningsanteckning, ny chatt context, or överlämning till nästa chatt. Creates .chatgpt/handoffs/*.local.md and updates current.local.md; never stages, commits, pushes, resets, checks out, or runs shell commands.",
   workspace_exec:
-    "Use this when the user asks to run a local repository script or validation command. Runs an argv array inside an approved repository with policy checks and bounded output.",
+    "Use this when the user asks to run a local repository script or validation command, including uv run, npm, and npx. Runs a direct argv array deterministically inside the declared repo-relative cwd with policy checks and bounded output; policy rejections include the exact stage, reason, and trigger.",
   workspace_run_script:
-    "Use this when the user asks to run repo-local experiments or validation steps. Inline script text is materialized under workspace scratch and then run with bounded output.",
+    "Use this when the user asks to run repo-local Python, Node, or POSIX experiments. Successful inline wrappers are removed automatically; failed wrappers are retained for diagnosis.",
   workspace_save_file:
     "Use this when the user asks to save UTF-8, base64, or hex data to an approved repo-local path, including binary artifacts, without relying on a command runner.",
   workspace_run_python:

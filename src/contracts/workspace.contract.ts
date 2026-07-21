@@ -47,7 +47,8 @@ export const WorkspaceExecResultSchema = z.object({
 export const WorkspaceRunScriptResultSchema = WorkspaceExecResultSchema.extend({
   interpreter: z.string(),
   script_path: z.string(),
-  generated_script_path: z.string().optional()
+  generated_script_path: z.string().optional(),
+  generated_script_cleaned: z.boolean().optional()
 });
 
 export const WorkspaceRunPythonInputSchema = RunScriptCommonSchema.extend({
