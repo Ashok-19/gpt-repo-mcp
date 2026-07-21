@@ -94,6 +94,9 @@ export class WorkspaceService {
         cwd: cwd.repoPath,
         resolved_cwd: cwd.absolutePath,
         cmd,
+        preservation_requested: input.preserve_tracked_worktree ?? false,
+        restored_tracked_paths: [],
+        preservation_warnings: [],
         dry_run: true
       };
     }
@@ -109,8 +112,9 @@ export class WorkspaceService {
       cwd: string;
       resolved_cwd: string;
       cmd: string[];
-      restored_tracked_paths?: string[];
-      preservation_warnings?: string[];
+      preservation_requested: boolean;
+      restored_tracked_paths: string[];
+      preservation_warnings: string[];
     }>((resolvePromise, reject) => {
       let timedOut = false;
       const stdout = cappedCollector(maxStdoutBytes);
@@ -160,7 +164,9 @@ export class WorkspaceService {
             cwd: cwd.repoPath,
             resolved_cwd: cwd.absolutePath,
             cmd,
-            ...(preservation ? { restored_tracked_paths: restored, preservation_warnings: warnings } : {})
+            preservation_requested: input.preserve_tracked_worktree ?? false,
+            restored_tracked_paths: restored,
+            preservation_warnings: warnings
           });
         }).catch(reject);
       });

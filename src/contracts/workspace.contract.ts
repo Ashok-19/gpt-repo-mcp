@@ -44,8 +44,9 @@ export const WorkspaceExecResultSchema = z.object({
   cwd: z.string().describe("Resolved repo-relative working directory."),
   resolved_cwd: z.string().describe("Resolved absolute working directory used for execution."),
   cmd: z.array(z.string()),
-  restored_tracked_paths: z.array(z.string()).optional().describe("Tracked paths restored after the command when preservation was requested."),
-  preservation_warnings: z.array(z.string()).optional().describe("Non-fatal tracked-worktree preservation warnings."),
+  preservation_requested: z.boolean().describe("Whether tracked-worktree preservation was requested for this execution."),
+  restored_tracked_paths: z.array(z.string()).describe("Tracked paths restored after the command; empty when none were restored."),
+  preservation_warnings: z.array(z.string()).describe("Non-fatal tracked-worktree preservation warnings; empty when none occurred."),
   dry_run: z.boolean().optional()
 });
 
