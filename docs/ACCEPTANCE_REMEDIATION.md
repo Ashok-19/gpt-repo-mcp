@@ -72,6 +72,23 @@ sizes. Selected-output fallback now resolves against files actually downloaded b
 the official CLI, so listing metadata is not trusted for byte/hash evidence. Preserve
 raw list responses if upstream normalization is still needed.
 
+## Terminal URL anomaly
+
+A terminal line containing only `/t/<token>/mcp` was printed by a pre-schema-revision
+`connect-dev.mjs` process. Restarting only its `dist/server.js` child does not reload
+the parent JavaScript process, so that parent can keep printing its old URL format.
+It does not rewrite a URL already entered in ChatGPT.
+
+Stop the entire `npm run connect` stack with `Ctrl+C`, start it again from this
+checkout, and use the newly printed URL verbatim. The current source prints
+`/s/2/t/<token>/mcp`; any output lacking `/s/2/` is from an old process or another
+checkout. The live local health endpoint currently reports server `0.2.1`, schema
+revision `2`, 30 core tools, and four Kaggle tools.
+
+After the exact `/s/2/` URL is entered, finish the authorization dialog by clicking
+**Connect**. Then open a new chat. The old unversioned route is retired and returns
+HTTP 410, so it cannot serve the repaired MCP surface.
+
 Large command output remains bounded and explicitly marked truncated. Moving full
 logs into pageable MCP resources is a separate P2 change because it requires a log
 resource lifecycle; it was not mixed into the execution-safety fixes.
