@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { PathSandbox } from "../src/services/path-sandbox.js";
 import { SearchService } from "../src/services/search-service.js";
@@ -28,6 +30,20 @@ describe("SearchService", () => {
     expect((await service.search({ query: "super-secret" })).returned_count).toBe(0);
     expect((await service.search({ query: "ignored" })).returned_count).toBe(0);
     expect((await service.search({ query: "nested" })).returned_count).toBe(0);
+  });
+
+  test("skips common generated roots and reports oversized files", async () => {
+    const fixture = await createRepoFixture();
+    await mkdir(join(fixture.root, "runs"), { recursive: true });
+    await writeFile(join(fixture.root, "runs", "old.txt"), "needle\n");
+    await writeFile(join(fixture.root, "large.csv"), `needle,${"x".repeat(128_000)}\n`);
+
+    const result = await new SearchService(fixture.root, new PathSandbox(fixture.root)).search({ query: "needle" });
+
+    expect(result.returned_count).toBe(0);
+    expect(result.warnings).toEqual([
+      expect.stringMatching(/^Skipped large file large\.csv \(\d+ bytes; limit 128000\)\.$/)
+    ]);
   });
 
   test("supports regex mode", async () => {

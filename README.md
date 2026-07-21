@@ -51,6 +51,8 @@ npm run add -- /path/to/your/repo
 
 The copied starter config is valid and empty. This command adds the first approved repository.
 
+Configure the actual active project directory, even when it is a subdirectory of a larger Git worktree. Add archive or sibling projects as separate `repo_id` entries only when they need to be inspected; every read, search, Git operation, and command is scoped to the selected configured root.
+
 Interactive terminals prompt for a permission mode: `read`, `write`, or `ship`.
 
 For predictable setup in scripts or CI-like terminals:

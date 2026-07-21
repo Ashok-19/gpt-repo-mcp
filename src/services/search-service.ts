@@ -40,7 +40,9 @@ export class SearchService {
       before: string[];
       after: string[];
     }> = [];
-    const warnings: string[] = [];
+    const warnings: string[] = tree.truncated
+      ? ["Search source tree was truncated; narrow include_globs or use repo_tree continuation before searching."]
+      : [];
 
     for (const entry of tree.entries) {
       if (entry.type !== "file") {
@@ -53,6 +55,11 @@ export class SearchService {
         continue;
       }
       const resolved = await this.sandbox.resolve(entry.path);
+      const size = entry.size_bytes ?? 0;
+      if (size > DEFAULT_LIMITS.max_bytes_per_file) {
+        warnings.push(`Skipped large file ${entry.path} (${size} bytes; limit ${DEFAULT_LIMITS.max_bytes_per_file}).`);
+        continue;
+      }
       const classification = await this.classifier.classify(entry.path, resolved.absolutePath);
       if (classification.is_binary) {
         continue;

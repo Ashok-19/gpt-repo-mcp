@@ -112,7 +112,7 @@ Example:
 
 ### `repo_search`
 
-Searches text files with literal or regex matching. It respects default excludes and skips secret candidates.
+Searches text files with literal or regex matching. It respects default excludes, including common `scratch`, `runs`, and `checkpoints` roots, skips secret candidates and binary files, and reports rather than opening files above the bounded per-file limit. A warning explicitly says when the source tree was truncated so the caller can narrow the search or continue with `repo_tree`.
 
 Input: `repo_id`, `query`, optional `mode`, `include_globs`, `exclude_globs`, `context_lines`, `max_results`, `cursor`.
 Output: `results[]` with `path`, `line`, `column`, `text`, `before`, `after`, plus counts, truncation, cursor, and warnings.
