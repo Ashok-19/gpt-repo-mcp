@@ -14,7 +14,7 @@ try {
 
 const CONFIG_PATH = "./config.local.json";
 const PORT = "8787";
-const TOOL_SCHEMA_REVISION = "2";
+const TOOL_SCHEMA_REVISION = "3";
 const NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels";
 const MCP_HEALTH_URL = `http://127.0.0.1:${PORT}/health`;
 const BUILT_SERVER_PATH = "dist/server.js";

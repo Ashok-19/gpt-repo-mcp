@@ -13,10 +13,10 @@ npm run connect
 This starts the local MCP server and starts or reuses ngrok as the built-in convenience HTTPS tunnel. Copy the exact printed URL:
 
 ```text
-ChatGPT MCP URL: https://<ngrok-host>/s/2/t/<random-token>/mcp
+ChatGPT MCP URL: https://<ngrok-host>/s/3/t/<random-token>/mcp
 ```
 
-ChatGPT cannot call `localhost` directly. The built-in convenience path uses a versioned public HTTPS `/s/2/t/<random-token>/mcp` endpoint so schema changes cannot reuse an old connector cache key.
+ChatGPT cannot call `localhost` directly. The built-in convenience path uses a versioned public HTTPS `/s/3/t/<random-token>/mcp` endpoint so schema changes cannot reuse an old connector cache key.
 
 The random path token is guess-resistance only, not authentication. Anyone with the full URL can reach the endpoint while the public tunnel is running. Treat public tunnel URLs as temporary local development endpoints and stop them between sessions.
 
@@ -58,7 +58,7 @@ npm run connect
 Paste the exact printed URL into the **Server URL** field:
 
 ```text
-https://<ngrok-host>/s/2/t/<random-token>/mcp
+https://<ngrok-host>/s/3/t/<random-token>/mcp
 ```
 
 ![ChatGPT Server URL setup](assets/chatgpt-server-url.png)
@@ -102,7 +102,7 @@ When mutating tools are enabled, ChatGPT requires confirmation for write, git, o
 ## Connection Options
 
 - Built-in convenience tunnel: run `npm run connect` and paste the printed versioned URL.
-- Manual tunnel provider: start the local server with an explicit token, expose port `8787` through your HTTPS tunnel or reverse proxy, and use `/s/2/t/<that-token>/mcp`.
+- Manual tunnel provider: start the local server with an explicit token, expose port `8787` through your HTTPS tunnel or reverse proxy, and use `/s/3/t/<that-token>/mcp`.
 - Advanced secure tunnel: run `npm run connect:secure` and choose Tunnel as the connector connection type.
 
 See [CONNECTION_OPTIONS.md](CONNECTION_OPTIONS.md) for provider setup, token details, and troubleshooting.

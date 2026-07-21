@@ -10,11 +10,12 @@ acceptance test, not an implementation task.
 Rules
 
 - Before opening the new chat, restart Local MCP, completely remove the old ChatGPT
-  connector, and add it again using the new `/s/2/` URL printed by `npm run connect`.
-  Confirm the server reports version 0.2.1. Browser/chat refreshes do not invalidate
+  connector, and add it again using the new `/s/3/` URL printed by `npm run connect`.
+  Confirm the server reports version 0.2.2. Browser/chat refreshes do not invalidate
   connector-cached schemas.
 - Use Local MCP tools directly. Do not use shell or Python workarounds for a tool
   failure.
+- Supply a short `reason` to every `workspace_exec` and `workspace_run_script` call.
 - Do not repeatedly rediscover schemas. Use the schemas already supplied by the
   connector; if discovery is genuinely required, do it once and count it.
 - Do not modify or commit tracked files in normal project repositories.
@@ -84,11 +85,14 @@ Checks
    acquire and release one unique official lock, and call `workspace_reap_processes`
    in dry-run mode. Any acquired state must be released even when a later check fails.
 
-9. Read `docs/TOOL_AUDIT.md`. Compare its 30 public tools with the connector's
-   visible tool list. Report any missing tool, unexpected legacy alias, duplicated
-   read/write tool, schema mismatch, or tool whose response is disproportionately
-   verbose. The repository test suite must have executed representative calls and
-   output-schema parsing for all 30 public tools.
+9. Read `docs/TOOL_AUDIT.md`. Confirm exactly 30 core repository/workspace tools are
+   visible and every tool returned by the upstream Kaggle MCP is also exposed with a
+   `kaggle_` prefix. The Kaggle count is dynamic; do not assume four. Confirm at
+   least one read-only and one mutation-capable Kaggle tool are visible, but do not
+   invoke a mutation-capable tool. Report missing tools, unexpected legacy core
+   aliases, schema mismatches, or disproportionately verbose responses. The
+   repository test suite must have executed representative calls and output-schema
+   parsing for all 30 core tools.
 
 10. Call `repo_git_review` on `gpt-repo-mcp`. Confirm ordinary output is compact and
     MCP-created hash-matched new files would be reviewable while local `.chatgpt`

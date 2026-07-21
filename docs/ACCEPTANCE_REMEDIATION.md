@@ -12,11 +12,11 @@ The connector URL is now schema-versioned. The old unversioned route returns HTT
 with a newer server. After rebuild/restart, health reports:
 
 ```json
-{"version":"0.2.1","schema_revision":"2","core_tool_count":30,"kaggle_tool_count":4}
+{"version":"0.2.2","schema_revision":"3","core_tool_count":30,"kaggle_tool_count":<dynamic>}
 ```
 
-Server version `0.2.1` advertises `tools.listChanged`, and `npm run connect` prints a
-new `/s/2/t/<token>/mcp` URL. ChatGPT connectors must be completely removed and added
+Server version `0.2.2` advertises `tools.listChanged`, and `npm run connect` prints a
+new `/s/3/t/<token>/mcp` URL. ChatGPT connectors must be completely removed and added
 again with that URL. Starting or refreshing a chat does not invalidate the cache.
 
 ## Fixes applied
@@ -47,6 +47,10 @@ again with that URL. Starting or refreshing a chat does not invalidate the cache
 | `2655363` | Compact saved notebook metadata |
 | `d606ef9` | Version connector URLs to bust schema caches |
 | `1697a07` | Diagnose and recover Kaggle output downloads |
+| `946bb1e` | Fix camelCase fallback inputs and remove the unsupported CLI filter |
+| `fc14da9` | Expose every upstream Kaggle tool by default |
+| `e229f57` | Require execution reasons in the advertised schemas |
+| `889b73a` | Document the full Kaggle tool surface |
 
 ## Verification
 
@@ -58,12 +62,12 @@ again with that URL. Starting or refreshing a chat does not invalidate the cache
 - Public-hygiene check passed.
 - Four configured repository roots passed config validation.
 - Worktree is clean.
-- Restarted live server reports version `0.2.1`, schema revision 2, 30 core tools, and four Kaggle tools.
+- A restarted live server reports version `0.2.2`, schema revision 3, 30 core tools, and the dynamic upstream Kaggle tool count.
 
 ## Retest boundary
 
 Completely remove the old ChatGPT connector, run `npm run connect`, and add a new
-connector with the printed `/s/2/` URL before rerunning the acceptance prompt. The
+connector with the printed `/s/3/` URL before rerunning the acceptance prompt. The
 retired unversioned URL intentionally returns 410.
 
 Kaggle file-list path and size values originate in the official upstream connector.
@@ -81,11 +85,11 @@ It does not rewrite a URL already entered in ChatGPT.
 
 Stop the entire `npm run connect` stack with `Ctrl+C`, start it again from this
 checkout, and use the newly printed URL verbatim. The current source prints
-`/s/2/t/<token>/mcp`; any output lacking `/s/2/` is from an old process or another
-checkout. The live local health endpoint currently reports server `0.2.1`, schema
-revision `2`, 30 core tools, and four Kaggle tools.
+`/s/3/t/<token>/mcp`; any output lacking `/s/3/` is from an old process or another
+checkout. The live local health endpoint reports server `0.2.2`, schema revision
+`3`, 30 core tools, and the dynamic upstream Kaggle tool count.
 
-After the exact `/s/2/` URL is entered, finish the authorization dialog by clicking
+After the exact `/s/3/` URL is entered, finish the authorization dialog by clicking
 **Connect**. Then open a new chat. The old unversioned route is retired and returns
 HTTP 410, so it cannot serve the repaired MCP surface.
 

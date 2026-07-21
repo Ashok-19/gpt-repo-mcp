@@ -22,7 +22,7 @@ For copy-paste install commands for macOS, Debian/Ubuntu Linux, and Windows, see
 Use `npm run connect` first for local OSS setup. It starts the local MCP server, starts or reuses ngrok as a convenience HTTPS tunnel, and prints a URL like:
 
 ```text
-ChatGPT MCP URL: https://<ngrok-host>/s/2/t/<random-token>/mcp
+ChatGPT MCP URL: https://<ngrok-host>/s/3/t/<random-token>/mcp
 ```
 
 Paste the exact printed URL into ChatGPT Developer Mode connector settings.
@@ -44,7 +44,7 @@ Cloudflare Tunnel example: `cloudflared tunnel --url http://localhost:8787`.
 Use this ChatGPT connector URL shape:
 
 ```text
-https://<public-host>/s/2/t/<that-token>/mcp
+https://<public-host>/s/3/t/<that-token>/mcp
 ```
 
 If you only need the local MCP server without a tunnel, run `npm run mcp`. It starts only the local server on localhost. It does not create a public path token or start a tunnel.

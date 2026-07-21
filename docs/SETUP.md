@@ -10,7 +10,7 @@ This guide gets a local GPT Repo MCP (`gpt-repo-mcp`) server configured for appr
 - ngrok for the built-in `npm run connect` convenience tunnel, or another HTTPS tunnel for manual setup
 - ChatGPT account with Developer Mode access
 
-ChatGPT cannot call `localhost` directly. The fastest OSS setup is `npm run connect`, which starts the local MCP server, starts or reuses ngrok, and prints a versioned temporary public HTTPS URL ending in `/s/2/t/<random-token>/mcp`.
+ChatGPT cannot call `localhost` directly. The fastest OSS setup is `npm run connect`, which starts the local MCP server, starts or reuses ngrok, and prints a versioned temporary public HTTPS URL ending in `/s/3/t/<random-token>/mcp`.
 
 ## Install ngrok from zero
 
@@ -130,7 +130,7 @@ Use the built-in convenience path first: `npm run connect`.
 This starts the local MCP server and tries to use or reuse ngrok. It should print:
 
 ```text
-ChatGPT MCP URL: https://<ngrok-host>/s/2/t/<random-token>/mcp
+ChatGPT MCP URL: https://<ngrok-host>/s/3/t/<random-token>/mcp
 ```
 
 Paste the exact printed URL into ChatGPT Developer Mode connector settings. The random path token is guess-resistance only, not authentication. Anyone with the full URL can reach the endpoint while the tunnel is running. Treat public tunnel URLs as temporary local development endpoints and stop them between sessions.
@@ -149,7 +149,7 @@ For a manual public tunnel, start the MCP server with an explicit random public 
 
 Then start a tunnel in another terminal with `ngrok http 8787` or `cloudflared tunnel --url http://localhost:8787`.
 
-Use `https://<public-host>/s/2/t/<that-token>/mcp`.
+Use `https://<public-host>/s/3/t/<that-token>/mcp`.
 
 You can also use `npm run tunnel` to start only the bundled ngrok command for local debugging.
 
@@ -159,7 +159,7 @@ For longer-lived or private connector setups, and for workspaces that support it
 
 ## How To Know It Worked
 
-- `npm run connect` prints an HTTPS URL ending in `/s/2/t/<random-token>/mcp`.
+- `npm run connect` prints an HTTPS URL ending in `/s/3/t/<random-token>/mcp`.
 - Or `npm run connect:secure` starts the local MCP server and `tunnel-client`.
 - ChatGPT Developer Mode accepts the connector URL.
 - A new ChatGPT conversation can call the connector.
