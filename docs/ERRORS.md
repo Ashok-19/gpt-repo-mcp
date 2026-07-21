@@ -14,7 +14,7 @@ All tool errors return:
     "diagnostics": {
       "applied_paths": ["docs/example.md"],
       "failed_path": "src/example.ts",
-      "recovery_hint": "Run repo_git_review, then use repo_git_restore_paths for tracked applied paths or repo_cleanup_paths for generated untracked artifacts."
+      "recovery_hint": "Run repo_git_review, then use its repo_write_recover payload for reviewed tracked or generated paths."
     }
   }
 }

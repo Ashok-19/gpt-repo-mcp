@@ -22,7 +22,7 @@ Security-sensitive areas include:
 - tunnel setup, public URL handling, and audit logging
 - MCP tool schemas, tool annotations, and structured error output
 
-GPT Repo MCP intentionally does not provide shell execution, arbitrary command execution, push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, branch deletion, or direct Codex execution tools.
+GPT Repo MCP provides policy-constrained workspace execution inside approved repositories. It intentionally does not provide push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, branch deletion, or direct Codex execution tools.
 
 ## Disclosure
 

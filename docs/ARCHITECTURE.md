@@ -12,7 +12,7 @@ GPT Repo MCP (`gpt-repo-mcp`) is a tool-only MCP server. There is no widget in v
 - `src/tools/catalog.ts` is metadata plus handler wiring only.
 - `src/tools/define-tool.ts` converts contract objects to MCP SDK schemas and registers metadata.
 - `src/tools/handlers.ts` contains thin adapters from tool input to services.
-- `src/services/*` contains filesystem, git, search, tree, read, write, project, task, decision, and advisory planning logic.
+- `src/services/*` contains filesystem, Git, search, tree, read, write, execution, review, task, and connector logic.
 - `src/policies/*` contains shared limits, excludes, write defaults, and secret patterns.
 - `src/runtime/*` contains context, structured errors, result envelopes, and audit logging.
 
@@ -52,25 +52,13 @@ write handlers -> OperationReceiptService
 
 `OperationReceiptService` writes lightweight local receipt metadata after successful actual changed write operations and reads it through `repo_last_write`. Receipts live at `.chatgpt/operations/last-write.json`, are ignored by Git, and contain only safe metadata such as repo-relative paths, counts, timestamps, best-effort HEAD SHAs, and summaries. They do not store contents, snippets, diffs, prompts, command output, secrets, or absolute paths.
 
-Read-only git status and diff operations are owned by `GitService`. Safe local git staging, one-call reviewed stage-and-commit, commit, and explicit worktree restore operations are separate opt-in mutating tools with their own contracts, policy checks, and service logic. Advisory services call existing factual services where practical instead of bypassing repo policy.
+Read-only Git status and diff operations are owned by `GitService`. Reviewed stage-and-commit and recovery operations are separate opt-in mutating tools with their own contracts, policy checks, and service logic.
 
-Git recovery is separate from write tools. `repo_write_file` and `repo_write_changes` write files only. `repo_write_recover` is the reviewed composite recovery helper: after `expected_head_sha` verification it can unstage explicit paths, restore explicit tracked worktree paths, and clean explicit generated artifacts through cleanup policy in one approved call. `repo_git_restore_paths` remains the granular worktree-only restore tool with fixed `git restore -- <paths>` arguments; it does not unstage, stage, commit, reset, checkout, clean, stash, restore the whole repo, or run shell commands.
+Git recovery is separate from write tools. `repo_write_file` and `repo_write_changes` write files only. `repo_write_recover` verifies reviewed state before it unstages explicit paths, restores explicit tracked worktree paths, or cleans explicit generated artifacts through cleanup policy.
 
-`repo_git_review` remains read-only, but it is the workflow hub after write operations. It classifies changed paths and returns ready-to-run payloads for composite `repo_write_stage_commit` and `repo_write_recover` workflows, plus granular explicit worktree restore, cleanup-eligible generated untracked paths, unstage, stage, and commit operations without executing any of them. When staged paths exist, it adds guidance that granular restore is worktree-only while `repo_write_recover` can explicitly unstage and restore the same reviewed path in one approved call.
+`repo_git_review` remains read-only, but it is the workflow hub after write operations. It classifies changed paths and returns ready-to-run payloads for `repo_write_stage_commit` and `repo_write_recover` without executing either operation.
 
-The preferred high-level mutation flow is `repo_git_review` followed by the review-provided `repo_write_stage_commit` or `repo_write_recover` payload after explicit user approval. Granular tools remain available for specific requested operations, staged-only commits, troubleshooting, or cases where composite payloads are absent.
-
-## Advisory Planning Workflows
-
-The advisory tools are read-only:
-
-- Onboarding/daily planning: `repo_project_brief` -> `repo_task_inventory` -> `repo_next_action`
-- Project memory: `repo_decision_memory`
-- Implementation/refactor/debug planning: `repo_decision_memory` when conventions matter -> `repo_change_plan` -> targeted `repo_search`/`repo_fetch_file`/`repo_read_many`
-- Current-change review: `repo_git_status` -> `repo_git_diff`
-- Broad or ambiguous review: `repo_plan_review` before broad reading
-
-`repo_next_action` recommends next work; it does not execute tests. `repo_change_plan` proposes implementation steps; it does not write files.
+The preferred mutation flow is `repo_git_review` followed by the review-provided `repo_write_stage_commit` or `repo_write_recover` payload after explicit user approval.
 
 ## Adding a Tool
 
@@ -90,4 +78,4 @@ Do not duplicate path validation, ignore handling, secret scanning, schema defin
 
 Mutating tools are disabled by default per repository and must be enabled through explicit repo-local policy. `repo_write_file` can write or exact-match edit one file inside configured allowed globs and outside configured denied globs. `repo_write_changes` applies the same write/edit semantics to an ordered multi-file edit pack and supports grouped same-file exact-match edits without allowing duplicate top-level paths.
 
-Mutating tools must stay separate from read tools. Do not loosen read services to support mutation, do not add shell execution, and do not add broad git automation. Safe git tools stage explicit paths, unstage explicit paths, restore explicit worktree paths, or create a local commit from an exact staged path list only after policy and HEAD checks. Cleanup tools remove only explicit generated artifacts allowed by cleanup policy.
+Mutating tools must stay separate from read tools. Do not loosen read services to support mutation or add broad Git automation. Workspace execution remains constrained by approved roots, execution policy, timeouts, output limits, and process-group cleanup. Cleanup tools remove only explicit generated artifacts allowed by cleanup policy.

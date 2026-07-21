@@ -16,9 +16,9 @@ Mutating tools use separate write annotations:
 - `openWorldHint: false`
 - `idempotentHint: false`
 
-No shell execution tools, arbitrary command runners, direct Codex execution tools, push/pull/reset/checkout/switch/rebase/merge/stash/clean tools, force operations, or branch deletion tools are registered. Safe local git staging and commit tools use fixed `git` argument arrays through `execFile`; they are not arbitrary git command runners. Advisory tools such as `repo_change_plan` and `repo_next_action` return plans and recommendations only; they do not write files or run tests.
+`workspace_exec` runs direct argv commands and `workspace_run_script` runs bounded Python, Node, or POSIX scripts inside approved repositories. Execution policy blocks administrative commands, constrains paths and working directories, applies timeouts and output limits, and terminates process groups on timeout. No direct Codex execution, push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, or branch deletion tools are registered.
 
-Codex task tools do not run Codex or execute commands. `repo_prepare_codex_task` renders a prompt in tool output, `repo_write_codex_task` writes local prompt metadata under `.chatgpt/codex-runs/` through the normal write policy, and `repo_codex_review` reads the run result plus git review state. The user remains responsible for running Codex separately.
+Codex task tools do not run Codex. `repo_write_codex_task` writes local prompt metadata under `.chatgpt/codex-runs/` through the normal write policy, and `repo_codex_review` reads the run result plus Git review state. The user remains responsible for running Codex separately.
 
 ## Transport
 
@@ -38,7 +38,7 @@ All model-supplied paths must be repo-relative POSIX paths. `PathSandbox` reject
 
 ## Default Excludes
 
-Default excludes apply consistently to tree, search, bounded reads, project briefing, task inventory, decision memory, change planning, and next-action signals. Common excluded areas include Git internals, dependency directories, generated output/cache directories, coverage, virtual environments, and generated test artifacts.
+Default excludes apply consistently to tree, search, and bounded reads. Common excluded areas include Git internals, dependency directories, generated output/cache directories, coverage, virtual environments, and generated test artifacts.
 
 Generated/default-excluded files can be fetched only through `repo_fetch_file` with `override_default_excludes: true`, and the result includes a warning. Secret candidates remain blocked.
 
@@ -60,7 +60,7 @@ The CLI permission modes are config shortcuts only:
 - `write`: broad repo-local file edits enabled under write policy, with hard denied paths and secret checks still enforced.
 - `ship`: write mode plus local git stage, commit, recover, and cleanup operations.
 
-No mode enables shell execution, arbitrary command execution, push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, or branch deletion.
+Repository permission modes do not change the separate workspace execution policy. No mode enables push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, or branch deletion.
 
 Default allowed write globs are `.chatgpt/**`, `.codex/**`, `docs/**`, exact root public docs (`README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `SUPPORT.md`, `LICENSE`), and exact `.gitignore`. This is not a general root-write allowance; root files such as `package.json`, source files, scripts, tests, and arbitrary notes remain blocked unless the repo opts in with custom allow globs. The `.gitignore` allowance is a narrow repo-metadata path for adding local-only ignore policy. Default denied write globs include real env files, private key files, Git internals, root and nested dependency directories, common generated/cache directories, coverage, test results, and virtual environments. Denied globs and hard secret-candidate checks win over allowed globs.
 
@@ -74,13 +74,13 @@ Clone-based `npm run add -- <path> --mode write` and `--mode ship` intentionally
 
 Local git operations are disabled by default for every repo. A repo must opt in with `operations.enabled: true`, `operations.git_stage_enabled: true`, and `operations.git_commit_enabled: true` as appropriate.
 
-`repo_git_stage` and `repo_git_unstage` accept only explicit repo-relative POSIX paths and require `expected_head_sha`. They reject empty path lists, `.`, `*`, shell-like pathspecs, absolute paths, traversal, `.git`, real environment files, private key/certificate files, identity key filenames, and directories literally named `secrets` or `credentials`. Legitimate code, docs, and tests whose filenames contain words like `secret` or `credential` are allowed when the path is explicit and otherwise safe. Actual staging uses fixed `git add -- <paths>` arguments, and actual unstaging uses fixed `git restore --staged -- <paths>` arguments.
+`repo_write_stage_commit` accepts a recent `repo_git_review` token or an exact legacy path list. It rechecks HEAD, reviewed paths, content hashes, secret policy, and the exact staged set before creating a local commit. `repo_write_recover` similarly verifies reviewed state before unstaging, restoring, or cleaning explicit paths.
 
 Public environment template files can be staged only through a narrow filename allowlist: `.env.example`, `.env.sample`, `.env.template`, and `example.env`. These files are still read and scanned for secret-looking values before staging or commit validation. Real environment files such as `.env`, `.env.local`, and `.env.production` remain blocked.
 
-`repo_git_commit` requires `expected_head_sha`, a non-empty message, and non-empty `expected_staged_paths`. It verifies actual staged paths exactly match the expected list before using fixed `git commit -m <message>` arguments. It does not stage files, use `git commit -a`, or push.
+Commit operations require a non-empty message, refuse stale review state, and never use `git commit -a` or push.
 
-`repo_cleanup_paths` is disabled by default and requires both `operations.enabled: true` and `operations.cleanup_enabled: true`. It deletes only explicitly listed repo-relative paths that match `operations.cleanup_allowed_globs` and refuses targets tracked by Git. Defaults are `.chatgpt/tool-tests/**`, `.chatgpt/backups/**`, `.chatgpt/audits/**`, `.chatgpt/backlog/**`, `.chatgpt/codex-runs/**`, `coverage/**`, `dist/**`, and `test-results/**`. It rejects absolute paths, traversal, `.`, `*`, broad pathspec-like values, `.git`, `.env`, secret-looking paths, symlink escapes, device files, sockets, and named pipes. Deletion uses Node filesystem APIs only and never runs `git clean`.
+`workspace_cleanup_paths` is disabled by default and requires cleanup policy opt-in. It deletes only explicitly listed repo-relative paths that match configured cleanup globs and refuses tracked targets. It rejects absolute paths, traversal, broad pathspec-like values, Git internals, environment files, secret-looking paths, symlink escapes, device files, sockets, and named pipes. Deletion uses Node filesystem APIs only and never runs `git clean`.
 
 ## Nested Repos and Submodules
 

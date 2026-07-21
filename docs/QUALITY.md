@@ -32,7 +32,7 @@ This project is a closed-world MCP server for approved local repositories. Quali
 
 ## Security Rules
 
-- Do not add shell execution or generic command execution.
+- Keep workspace execution constrained by approved roots, policy checks, timeouts, output limits, and process-group cleanup.
 - Do not weaken approved-root, path traversal, symlink, secret, denied glob, expected SHA, expected HEAD, or exact staged path checks.
 - Do not expose push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, branch deletion, or arbitrary git command tools.
 - Prefer repo-relative paths in outputs and logs.
@@ -60,7 +60,7 @@ npm test -- tests/file-writer.test.ts tests/git-operations-service.test.ts tests
 ## Release Readiness Checklist
 
 - README describes the current tool surface and disabled-by-default mutating tools.
-- `docs/SECURITY.md`, `docs/TOOL_SURFACE.md`, `docs/WRITE_WORKFLOWS.md`, and this file are current.
+- `docs/SECURITY.md`, `docs/TOOL_AUDIT.md`, and this file are current.
 - `docs/ERRORS.md` lists stable error codes.
 - CI must pass before merge.
 - Contract tests must run when the tool surface, annotations, or schemas change.
@@ -87,9 +87,9 @@ npm test -- tests/file-writer.test.ts tests/git-operations-service.test.ts tests
 2. Use mutating annotations and add the tool to the shared mutating tool list.
 3. Provide `dry_run` where practical.
 4. Require explicit repo-relative paths where paths are applicable.
-5. Do not use shell execution or arbitrary git/command runners.
+5. Reuse the existing execution policy instead of adding another command runner.
 6. Put authorization decisions in a policy or service layer.
 7. Put execution logic in a service, not a handler.
 8. Add focused service tests for policy, safety, dry-run, and mutation behavior.
 9. Add MCP contract and tool contract tests.
-10. Update security, tool surface, workflow, and error docs.
+10. Update security, tool audit, and error docs.

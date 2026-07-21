@@ -31,8 +31,7 @@ git diff --check
 - Verify `docs/CHATGPT_CONNECT.md`.
 - Verify `docs/CONNECTION_OPTIONS.md`.
 - Verify `docs/SECURITY.md`.
-- Verify `docs/TOOL_SURFACE.md`.
-- Verify `docs/WRITE_WORKFLOWS.md`.
+- Verify `docs/TOOL_AUDIT.md`.
 - Verify `docs/QUALITY.md`.
 - Verify `docs/RELEASE_CHECKLIST.md`.
 - Verify root `SECURITY.md`.
@@ -63,5 +62,5 @@ git diff --check
 
 - Verify read tools remain read-only.
 - Verify mutating tools remain disabled by default.
-- Verify no shell execution or arbitrary command runner was added.
+- Verify workspace execution remains constrained by approved roots and execution policy.
 - Verify no push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, branch deletion, or arbitrary git command tool was added.

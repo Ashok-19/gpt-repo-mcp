@@ -22,7 +22,7 @@ Use targeted tests for the area you changed before broad validation.
 
 ## Safety Rules
 
-- Do not add shell execution or arbitrary command-runner tools.
+- Keep workspace execution constrained by repository roots, direct argv/script schemas, timeouts, output limits, and policy diagnostics.
 - Do not weaken sandbox, secret, path, write, git, or cleanup policies.
 - Keep tool changes contract-first: contracts -> toolContracts -> catalog -> define-tool -> handlers -> services.
 - Keep the tool catalog metadata-only and handlers thin.

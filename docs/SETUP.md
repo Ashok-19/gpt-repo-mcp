@@ -93,7 +93,7 @@ npm run add -- /path/to/your/repo --mode ship
 - `write`: read tools plus broad repo-local writes guarded by hard denied paths, secret checks, path sandboxing, and size limits.
 - `ship`: write mode plus local git stage, commit, recover, and cleanup operations.
 
-No mode enables push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, branch deletion, shell execution, or arbitrary command execution.
+Repository permission modes do not alter the separate workspace execution policy. No mode enables push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, or branch deletion.
 
 Permission mode summary:
 
