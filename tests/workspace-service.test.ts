@@ -257,6 +257,31 @@ describe("WorkspaceService", () => {
       });
   });
 
+  test("restores tracked files created by validation without touching prior changes", async () => {
+    const fixture = await createRepoFixture();
+    await execFileAsync("git", ["init"], { cwd: fixture.root });
+    await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: fixture.root });
+    await execFileAsync("git", ["config", "user.name", "Test User"], { cwd: fixture.root });
+    await execFileAsync("git", ["add", "src/app.ts", "docs/guide.md"], { cwd: fixture.root });
+    await execFileAsync("git", ["commit", "-m", "initial"], { cwd: fixture.root });
+    await writeFile(join(fixture.root, "docs", "guide.md"), "prior user change\n");
+
+    const result = await (await workspace(fixture.root)).exec({
+      cwd: ".",
+      cmd: ["node", "-e", "require('node:fs').writeFileSync('src/app.ts', 'generated validation output\\n')"],
+      preserve_tracked_worktree: true,
+      reason: "Run artifact-producing validation"
+    });
+
+    expect(result).toMatchObject({
+      exit_code: 0,
+      restored_tracked_paths: ["src/app.ts"],
+      preservation_warnings: []
+    });
+    await expect(readFile(join(fixture.root, "src", "app.ts"), "utf8")).resolves.toContain("export function rawFetch()");
+    await expect(readFile(join(fixture.root, "docs", "guide.md"), "utf8")).resolves.toBe("prior user change\n");
+  });
+
   test("saves binary files directly inside the approved repo", async () => {
     const fixture = await createRepoFixture();
     const service = await workspace(fixture.root);

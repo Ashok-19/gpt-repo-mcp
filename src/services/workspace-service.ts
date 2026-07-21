@@ -9,6 +9,7 @@ import { DEFAULT_WORKSPACE_POLICY } from "../policies/workspace-defaults.js";
 import { RepoReaderError, toRepoReaderError } from "../runtime/errors.js";
 import { PathSandbox, validateRepoPath } from "./path-sandbox.js";
 import { WorkspacePolicy } from "./workspace-policy.js";
+import { GitService } from "./git-service.js";
 import type {
   WorkspaceApplyPatchInput,
   WorkspaceDeletePathsInput,
@@ -77,6 +78,9 @@ export class WorkspaceService {
     const maxStdoutBytes = Math.min(input.max_stdout_bytes ?? this.policy.config.exec_max_output_bytes, this.policy.config.exec_max_output_bytes);
     const maxStderrBytes = Math.min(input.max_stderr_bytes ?? this.policy.config.exec_max_output_bytes, this.policy.config.exec_max_output_bytes);
     const started = Date.now();
+    const preservation = input.preserve_tracked_worktree && !input.dry_run
+      ? await this.captureTrackedState()
+      : undefined;
 
     if (input.dry_run) {
       return {
@@ -103,6 +107,8 @@ export class WorkspaceService {
       stderr_truncated: boolean;
       cwd: string;
       cmd: string[];
+      restored_tracked_paths?: string[];
+      preservation_warnings?: string[];
     }>((resolvePromise, reject) => {
       let timedOut = false;
       const stdout = cappedCollector(maxStdoutBytes);
@@ -140,17 +146,20 @@ export class WorkspaceService {
       });
       child.on("close", (code) => {
         clearTimeout(timer);
-        resolvePromise({
-          exit_code: code,
-          stdout: stdout.text(),
-          stderr: stderr.text(),
-          duration_ms: Date.now() - started,
-          timed_out: timedOut,
-          stdout_truncated: stdout.truncated(),
-          stderr_truncated: stderr.truncated(),
-          cwd: cwd.repoPath,
-          cmd
-        });
+        void this.restoreNewTrackedChanges(preservation).then(({ restored, warnings }) => {
+          resolvePromise({
+            exit_code: code,
+            stdout: stdout.text(),
+            stderr: stderr.text(),
+            duration_ms: Date.now() - started,
+            timed_out: timedOut,
+            stdout_truncated: stdout.truncated(),
+            stderr_truncated: stderr.truncated(),
+            cwd: cwd.repoPath,
+            cmd,
+            ...(preservation ? { restored_tracked_paths: restored, preservation_warnings: warnings } : {})
+          });
+        }).catch(reject);
       });
     });
   }
@@ -175,6 +184,7 @@ export class WorkspaceService {
       max_stdout_bytes: input.max_stdout_bytes,
       max_stderr_bytes: input.max_stderr_bytes,
       env: input.env,
+      preserve_tracked_worktree: input.preserve_tracked_worktree,
       dry_run: input.dry_run,
       reason: input.reason
     });
@@ -201,6 +211,7 @@ export class WorkspaceService {
       max_stdout_bytes: input.max_stdout_bytes,
       max_stderr_bytes: input.max_stderr_bytes,
       env: input.env,
+      preserve_tracked_worktree: input.preserve_tracked_worktree,
       dry_run: input.dry_run,
       reason: input.reason
     });
@@ -589,6 +600,7 @@ export class WorkspaceService {
       max_stdout_bytes: input.max_stdout_bytes,
       max_stderr_bytes: input.max_stderr_bytes,
       env: input.env,
+      preserve_tracked_worktree: input.preserve_tracked_worktree,
       dry_run: input.dry_run,
       reason: input.reason
     });
@@ -612,6 +624,41 @@ export class WorkspaceService {
       ...(prepared.generated && !cleaned ? { generated_script_path: prepared.repoPath } : {}),
       ...(prepared.generated ? { generated_script_cleaned: cleaned } : {})
     };
+  }
+
+  private async captureTrackedState(): Promise<{ dirty: Set<string>; tracked: Set<string> }> {
+    const [status, tracked] = await Promise.all([
+      new GitService(this.root).status(),
+      execFileAsync("git", ["ls-files", "--", "."], {
+        cwd: this.root,
+        env: { PATH: process.env.PATH ?? "" },
+        maxBuffer: 10 * 1024 * 1024
+      })
+    ]);
+    return {
+      dirty: new Set(status.files.flatMap((file) => [file.path, file.original_path].filter((path): path is string => Boolean(path)))),
+      tracked: new Set(tracked.stdout.split("\n").filter(Boolean))
+    };
+  }
+
+  private async restoreNewTrackedChanges(state?: { dirty: Set<string>; tracked: Set<string> }): Promise<{ restored: string[]; warnings: string[] }> {
+    if (!state) return { restored: [], warnings: [] };
+    const status = await new GitService(this.root).status();
+    const warnings: string[] = [];
+    const restored = status.files.filter((file) => {
+      if (file.original_path) {
+        warnings.push(`PRESERVE_RENAME_SKIPPED:${file.path}`);
+        return false;
+      }
+      return state.tracked.has(file.path) && !state.dirty.has(file.path);
+    }).map((file) => file.path);
+    if (restored.length > 0) {
+      await execFileAsync("git", ["restore", "--staged", "--worktree", "--source=HEAD", "--", ...restored], {
+        cwd: this.root,
+        env: { PATH: process.env.PATH ?? "" }
+      });
+    }
+    return { restored, warnings };
   }
 
   private assertRepoMutablePath(path: string): string {

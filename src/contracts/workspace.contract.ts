@@ -14,6 +14,7 @@ const RunScriptCommonSchema = RepoInputSchema.extend({
   max_stdout_bytes: z.number().int().positive().optional(),
   max_stderr_bytes: z.number().int().positive().optional(),
   env: StringRecordSchema.optional(),
+  preserve_tracked_worktree: z.boolean().optional().describe("Restore tracked files that were clean before the command but changed during it."),
   dry_run: z.boolean().optional(),
   reason: ReasonSchema
 });
@@ -26,6 +27,7 @@ export const WorkspaceExecInputSchema = RepoInputSchema.extend({
   max_stdout_bytes: z.number().int().positive().optional(),
   max_stderr_bytes: z.number().int().positive().optional(),
   env: StringRecordSchema.optional(),
+  preserve_tracked_worktree: z.boolean().optional().describe("Restore tracked files that were clean before the command but changed during it."),
   dry_run: z.boolean().optional(),
   reason: ReasonSchema
 });
@@ -41,6 +43,8 @@ export const WorkspaceExecResultSchema = z.object({
   stderr_truncated: z.boolean(),
   cwd: z.string(),
   cmd: z.array(z.string()),
+  restored_tracked_paths: z.array(z.string()).optional().describe("Tracked paths restored after the command when preservation was requested."),
+  preservation_warnings: z.array(z.string()).optional().describe("Non-fatal tracked-worktree preservation warnings."),
   dry_run: z.boolean().optional()
 });
 
