@@ -68,7 +68,7 @@ cp .env.example .env
 # Set GPT_REPO_KAGGLE_TOKEN in .env
 ```
 
-ChatGPT then receives every upstream Kaggle tool separately with a `kaggle_` prefix, such as `kaggle_search_competitions` and `kaggle_get_dataset_info`.
+ChatGPT receives four saved-notebook review tools by default: notebook info, file listing, selected-output download, and output-ZIP download. Set `GPT_REPO_KAGGLE_TOOLS` to a comma-separated upstream allowlist, or `*` only when the full Kaggle surface is genuinely needed. Exposed tools keep the `kaggle_` prefix.
 
 ### 3. Connect ChatGPT
 

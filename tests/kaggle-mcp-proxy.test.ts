@@ -72,6 +72,7 @@ describe("KaggleMcpProxy", () => {
 
   test("loads every upstream tools/list page", async () => {
     vi.stubEnv("GPT_REPO_KAGGLE_TOKEN", "test-token");
+    vi.stubEnv("GPT_REPO_KAGGLE_TOOLS", "first,second");
     const list = vi.spyOn(kaggleMcpProxy, "listTools")
       .mockResolvedValueOnce({ tools: [{ name: "first", inputSchema: { type: "object" } }], nextCursor: "page-2" })
       .mockResolvedValueOnce({ tools: [{ name: "second", inputSchema: { type: "object" } }] });
@@ -82,6 +83,42 @@ describe("KaggleMcpProxy", () => {
       ]);
       expect(list).toHaveBeenNthCalledWith(1, undefined);
       expect(list).toHaveBeenNthCalledWith(2, "page-2");
+    } finally {
+      list.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  test("exposes only saved-notebook review tools by default", async () => {
+    vi.stubEnv("GPT_REPO_KAGGLE_TOKEN", "test-token");
+    vi.stubEnv("GPT_REPO_KAGGLE_TOOLS", "");
+    const list = vi.spyOn(kaggleMcpProxy, "listTools").mockResolvedValue({ tools: [
+      { name: "get_notebook_info", inputSchema: { type: "object" } },
+      { name: "download_notebook_output_zip", inputSchema: { type: "object" } },
+      { name: "search_competitions", inputSchema: { type: "object" } },
+      { name: "submit_to_competition", inputSchema: { type: "object" } }
+    ] });
+    try {
+      await expect(loadKaggleTools()).resolves.toEqual([
+        expect.objectContaining({ name: "get_notebook_info" }),
+        expect.objectContaining({ name: "download_notebook_output_zip" })
+      ]);
+    } finally {
+      list.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  test("supports an explicit all-tools opt-in", async () => {
+    vi.stubEnv("GPT_REPO_KAGGLE_TOKEN", "test-token");
+    vi.stubEnv("GPT_REPO_KAGGLE_TOOLS", "*");
+    const tools = [
+      { name: "search_competitions", inputSchema: { type: "object" } },
+      { name: "submit_to_competition", inputSchema: { type: "object" } }
+    ] as KaggleTool[];
+    const list = vi.spyOn(kaggleMcpProxy, "listTools").mockResolvedValue({ tools });
+    try {
+      await expect(loadKaggleTools()).resolves.toEqual(tools);
     } finally {
       list.mockRestore();
       vi.unstubAllEnvs();
