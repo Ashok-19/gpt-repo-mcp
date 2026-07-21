@@ -120,9 +120,8 @@ async function materializeWithKaggleCli(result: CallToolResult, args: Record<str
     throw downloadError("KAGGLE_ARTIFACT_FALLBACK_INPUT_MISSING", "cli_fallback", args, "Signed URL returned 404 and the request lacks owner, slug, or output file for the official CLI fallback.", { http_status: httpStatus });
   }
   const directory = await mkdtemp(join(tmpdir(), "gpt-repo-mcp-kaggle-"));
-  const pattern = `(^|/)${escapeRegex(basename(requested.file))}$`;
   try {
-    await execFileAsync("kaggle", ["kernels", "output", `${requested.owner}/${requested.slug}`, "-p", directory, "-o", "-q", "--file-pattern", pattern], {
+    await execFileAsync("kaggle", ["kernels", "output", `${requested.owner}/${requested.slug}`, "-p", directory, "-o", "-q"], {
       timeout: 120_000,
       maxBuffer: 1_000_000,
       env: { ...process.env, ...(process.env.GPT_REPO_KAGGLE_TOKEN ? { KAGGLE_API_TOKEN: process.env.GPT_REPO_KAGGLE_TOKEN } : {}) }
@@ -203,10 +202,10 @@ function requestedArtifact(args: Record<string, unknown>) {
   const combined = findField(args, ["kernel", "notebook", "notebook_id"]);
   const [combinedOwner, combinedSlug] = typeof combined === "string" && combined.includes("/") ? combined.split("/", 2) : [];
   return {
-    owner: stringField(findField(args, ["owner", "username"])) ?? combinedOwner,
-    slug: stringField(findField(args, ["slug", "kernel_slug", "notebook_slug"])) ?? combinedSlug,
-    version: findField(args, ["version", "version_number", "saved_version"]),
-    file: stringField(findField(args, ["file", "file_name", "filename", "output_path", "path"]))
+    owner: stringField(findField(args, ["owner", "username", "ownerslug"])) ?? combinedOwner,
+    slug: stringField(findField(args, ["slug", "kernel_slug", "notebook_slug", "kernelslug"])) ?? combinedSlug,
+    version: findField(args, ["version", "version_number", "saved_version", "versionnumber"]),
+    file: stringField(findField(args, ["file", "file_name", "filename", "output_path", "path", "filepath"]))
   };
 }
 
@@ -237,10 +236,6 @@ async function listFiles(directory: string): Promise<string[]> {
     else if (entry.isFile()) files.push(path);
   }
   return files;
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function stringField(value: unknown): string | undefined {

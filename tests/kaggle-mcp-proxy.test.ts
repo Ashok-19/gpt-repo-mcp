@@ -128,7 +128,7 @@ describe("KaggleMcpProxy", () => {
     try {
       const result = await client.callTool({
         name: "kaggle_download_notebook_output",
-        arguments: { request: { owner: "owner", slug: "notebook", version: 1 } }
+        arguments: { ownerSlug: "owner", kernelSlug: "notebook", versionNumber: 1 }
       });
       expect(result.isError).toBe(true);
       expect(result.structuredContent).toMatchObject({
