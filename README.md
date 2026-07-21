@@ -283,6 +283,7 @@ New to ngrok? See [Install ngrok from zero](docs/SETUP.md#install-ngrok-from-zer
 - [Tool surface](docs/TOOL_SURFACE.md)
 - [Per-tool audit](docs/TOOL_AUDIT.md)
 - [New-session verification prompt](docs/NEW_SESSION_VERIFICATION_PROMPT.md)
+- [Acceptance remediation](docs/ACCEPTANCE_REMEDIATION.md)
 - [Write workflows](docs/WRITE_WORKFLOWS.md)
 - [Security model](docs/SECURITY.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md)
