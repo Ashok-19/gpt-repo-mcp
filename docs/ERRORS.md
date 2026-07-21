@@ -29,6 +29,7 @@ All tool errors return:
 | `UNKNOWN_REPO` | The requested `repo_id` is not registered as an approved repository root. |
 | `ABSOLUTE_PATH_REJECTED` | A repo-relative path field received an absolute path. |
 | `PATH_TRAVERSAL_REJECTED` | A path attempted to traverse outside the approved repository root. |
+| `PATH_NOT_FOUND` | The requested path does not exist under the approved repository root. |
 | `SYMLINK_ESCAPE_REJECTED` | A symlink resolved outside the approved repository root. |
 | `UNSUPPORTED_FILE_TYPE` | The resolved path is not a supported regular file. |
 | `BINARY_FILE_REJECTED` | A file read was blocked because the target appears to be binary. |

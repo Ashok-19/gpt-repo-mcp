@@ -1,8 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { RepoReaderError } from "../src/runtime/errors.js";
+import { RepoReaderError, toRepoReaderError } from "../src/runtime/errors.js";
 import { createErrorEnvelope, createSuccessEnvelope } from "../src/runtime/result-envelope.js";
 
 describe("result envelope", () => {
+  test("maps missing filesystem paths to a stable public error", () => {
+    expect(toRepoReaderError(Object.assign(new Error("raw path"), { code: "ENOENT" }))).toMatchObject({
+      code: "PATH_NOT_FOUND",
+      message: "Path does not exist."
+    });
+  });
   test("wraps successful structured content", () => {
     const result = createSuccessEnvelope({ repos: [] }, "No approved repositories configured.");
 
@@ -55,6 +61,7 @@ describe("result envelope", () => {
         reason_code: "NETWORK_COMMAND_BLOCKED",
         trigger: "curl",
         allowed_alternative: "Use a configured connector.",
+        safe_alternative: "Use a configured connector.",
         mutation_occurred: false
       }
     }));
@@ -64,6 +71,7 @@ describe("result envelope", () => {
       reason_code: "NETWORK_COMMAND_BLOCKED",
       trigger: "curl",
       allowed_alternative: "Use a configured connector.",
+      safe_alternative: "Use a configured connector.",
       mutation_occurred: false
     });
   });

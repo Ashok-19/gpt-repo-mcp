@@ -2,6 +2,7 @@ export type RepoReaderErrorCode =
   | "UNKNOWN_REPO"
   | "ABSOLUTE_PATH_REJECTED"
   | "PATH_TRAVERSAL_REJECTED"
+  | "PATH_NOT_FOUND"
   | "SYMLINK_ESCAPE_REJECTED"
   | "UNSUPPORTED_FILE_TYPE"
   | "BINARY_FILE_REJECTED"
@@ -66,6 +67,9 @@ export function toRepoReaderError(error: unknown): RepoReaderError {
     return error;
   }
   if (error instanceof Error) {
+    if ("code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+      return new RepoReaderError("PATH_NOT_FOUND", "Path does not exist.");
+    }
     return new RepoReaderError("INTERNAL_ERROR", error.message);
   }
   return new RepoReaderError("INTERNAL_ERROR", "Unexpected internal error");

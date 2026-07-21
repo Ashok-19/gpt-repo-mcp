@@ -90,6 +90,7 @@ function sanitizeDiagnostics(diagnostics: Record<string, unknown>): Record<strin
   copySafeTextDiagnostic(diagnostics, safe, "reason_code");
   copySafeTextDiagnostic(diagnostics, safe, "trigger");
   copySafeTextDiagnostic(diagnostics, safe, "allowed_alternative");
+  copySafeTextDiagnostic(diagnostics, safe, "safe_alternative");
   if (typeof diagnostics.mutation_occurred === "boolean") {
     safe.mutation_occurred = diagnostics.mutation_occurred;
   }

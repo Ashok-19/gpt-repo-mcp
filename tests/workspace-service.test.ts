@@ -310,7 +310,13 @@ describe("WorkspaceService", () => {
     const fixture = await createRepoFixture();
     const service = await workspace(fixture.root);
 
-    await expect(service.exec({ cwd: ".", cmd: ["sudo", "id"], reason: "Probe block" })).rejects.toMatchObject({ code: "EXECUTION_POLICY_REJECTED" });
+    await expect(service.exec({ cwd: ".", cmd: ["sudo", "id"], reason: "Probe block" })).rejects.toMatchObject({
+      code: "EXECUTION_POLICY_REJECTED",
+      diagnostics: {
+        reason_code: "ADMIN_COMMAND_BLOCKED",
+        safe_alternative: expect.stringContaining("without sudo")
+      }
+    });
     await expect(service.exec({ cwd: ".", cmd: ["curl", "https://example.com"], dry_run: true, reason: "Probe network family" })).resolves.toMatchObject({ dry_run: true });
     await expect(service.exec({ cwd: ".", cmd: ["timeout", "5", "curl", "https://example.com"], dry_run: true, reason: "Probe timeout wrapper" })).resolves.toMatchObject({ dry_run: true });
     await expect(service.exec({ cwd: ".", cmd: ["git", "push"], reason: "Probe block" })).rejects.toMatchObject({ code: "EXECUTION_POLICY_REJECTED" });

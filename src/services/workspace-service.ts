@@ -684,7 +684,7 @@ export class WorkspaceService {
       throw new RepoReaderError("VALIDATION_ERROR", "cmd must contain an executable.");
     }
     if (this.policy.config.exec_block_sudo && SUDO_COMMANDS.has(exe)) {
-      this.rejectCommand("ADMIN_COMMAND_BLOCKED", exe, `Command is blocked: ${exe}`);
+      this.rejectCommand("ADMIN_COMMAND_BLOCKED", exe, `Command is blocked: ${exe}`, "Run without sudo or ask the user to run the administrative command outside MCP.");
     }
     if (this.policy.config.exec_block_network && NETWORK_COMMANDS.has(exe)) {
       this.rejectCommand("NETWORK_COMMAND_BLOCKED", exe, `Network command is blocked: ${exe}`);
@@ -873,7 +873,7 @@ function commandPolicyError(reasonCode: string, trigger: string, message: string
       policy_stage: "pre_execution",
       reason_code: reasonCode,
       trigger,
-      ...(allowedAlternative ? { allowed_alternative: allowedAlternative } : {}),
+      ...(allowedAlternative ? { allowed_alternative: allowedAlternative, safe_alternative: allowedAlternative } : {}),
       mutation_occurred: false
     }
   });
